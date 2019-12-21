@@ -9,20 +9,21 @@ import (
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 var ErrClosedTransport = errors.New("read/write on closed transport")
 
-func (c *Client) Dial(urlStr string) error {
+func Dial(urlStr string) (*Client, error) {
+	c := &Client{}
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	switch u.Scheme {
 	case "tcp", "mqtt":
 		conn, err := net.Dial("tcp", u.Host)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		c.Transport = conn
 	default:
-		return ErrUnsupportedProtocol
+		return nil, ErrUnsupportedProtocol
 	}
 	c.connStateUpdate(StateActive)
 	c.connClosed = make(chan struct{})
@@ -34,7 +35,7 @@ func (c *Client) Dial(urlStr string) error {
 		c.mu.Unlock()
 	}()
 
-	return nil
+	return c, nil
 }
 
 func (c *Client) connStateUpdate(newState ConnState) {

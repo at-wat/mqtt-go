@@ -9,8 +9,8 @@ import (
 )
 
 func TestIntegration_Connect(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -25,8 +25,8 @@ func TestIntegration_Connect(t *testing.T) {
 }
 
 func TestIntegration_PublishQoS0(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -48,8 +48,8 @@ func TestIntegration_PublishQoS0(t *testing.T) {
 }
 
 func TestIntegration_PublishQoS1(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -72,8 +72,8 @@ func TestIntegration_PublishQoS1(t *testing.T) {
 }
 
 func TestIntegration_PublishQoS2_SubscribeQoS1(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -100,8 +100,8 @@ func TestIntegration_PublishQoS2_SubscribeQoS1(t *testing.T) {
 }
 
 func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -155,8 +155,8 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 }
 
 func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -179,8 +179,8 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 }
 
 func TestIntegration_Ping(t *testing.T) {
-	cli := &Client{}
-	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
+	cli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
