@@ -27,7 +27,7 @@ func TestIntegration_Connect(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -47,7 +47,7 @@ func TestIntegration_Publish(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -81,7 +81,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			chReceived := make(chan *Message, 10)
+			chReceived := make(chan *Message, 100)
 			var cntSub int
 			cli.Handler = HandlerFunc(func(msg *Message) {
 				chReceived <- msg
@@ -96,7 +96,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 				}
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -146,7 +146,7 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -174,7 +174,7 @@ func TestIntegration_Ping(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -211,7 +211,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 				}
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
