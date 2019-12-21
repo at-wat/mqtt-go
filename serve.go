@@ -29,10 +29,22 @@ func (c *Client) Serve() error {
 			return err
 		}
 		fmt.Printf("%s: %v\n", pktType, contents)
+
+		c.mu.RLock()
+		sig := c.sig
+		c.mu.RUnlock()
+
 		switch pktType {
 		case packetConnAck:
 			select {
-			case c.chConnAck <- (&ConnAck{}).parse(pktFlag, contents):
+			case sig.chConnAck <- (&ConnAck{}).parse(pktFlag, contents):
+			}
+		case packetPubAck:
+			if sig.chPubAck != nil {
+				pubAck := (&PubAck{}).parse(pktFlag, contents)
+				select {
+				case sig.chPubAck[pubAck.ID] <- pubAck:
+				}
 			}
 		}
 	}

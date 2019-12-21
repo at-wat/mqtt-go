@@ -57,36 +57,16 @@ func (t packetType) String() string {
 	return fmt.Sprintf("Unknown packet type %x", int(t))
 }
 
-type protocolLevel byte
-
-const (
-	protocol311 protocolLevel = 0x04
-)
-
-type connectFlag byte
-
-const (
-	flagCleanSession connectFlag = 0x02
-	flagWill                     = 0x04
-	flagWillQoS0                 = 0x00
-	flagWillQoS1                 = 0x08
-	flagWillQoS2                 = 0x10
-	flagWillRetain               = 0x20
-	flagPassword                 = 0x40
-	flagUserName                 = 0x80
-)
-
-const flagWillQoSBit = 3
-
-func pack(packetType byte, header []byte, payload []byte) []byte {
+func pack(packetType byte, contents ...[]byte) []byte {
 	pkt := []byte{packetType}
-	nHeader := len(header)
-	if nHeader > 0xFF {
-		panic("fixed header length overflow")
+	var n int
+	for _, c := range contents {
+		n += len(c)
 	}
-	pkt = append(pkt, remainingLength(len(header)+len(payload))...)
-	pkt = append(pkt, header...)
-	pkt = append(pkt, payload...)
+	pkt = append(pkt, remainingLength(n)...)
+	for _, c := range contents {
+		pkt = append(pkt, c...)
+	}
 	return pkt
 }
 
@@ -117,18 +97,22 @@ func remainingLength(n int) []byte {
 }
 
 func packString(s string) []byte {
+	return packBytes([]byte(s))
+}
+
+func packBytes(s []byte) []byte {
 	n := len(s)
 	if n > 0xFFFF {
 		panic("string length overflow")
 	}
-	ret := []byte{byte(n >> 8), byte(n)}
-	ret = append(ret, []byte(s)...)
+	ret := packUint16(uint16(n))
+	ret = append(ret, s...)
 	return ret
 }
 
-func (p *ConnAck) parse(flag byte, contents []byte) *ConnAck {
-	return &ConnAck{
-		SessionPresent: (contents[0]&0x01 != 0),
-		Code:           ConnectionReturnCode(contents[1]),
+func packUint16(v uint16) []byte {
+	return []byte{
+		byte(v >> 8),
+		byte(v),
 	}
 }

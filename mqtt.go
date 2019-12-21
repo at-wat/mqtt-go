@@ -2,8 +2,8 @@ package mqtt
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -20,7 +20,8 @@ type Message struct {
 	ID      uint16
 	QoS     QoS
 	Retain  bool
-	Message []byte
+	Dup     bool
+	Payload []byte
 }
 
 type Subscription struct {
@@ -64,40 +65,6 @@ const (
 	StateClosed
 )
 
-type ConnectionReturnCode byte
-
-const (
-	ConnectionAccepted          ConnectionReturnCode = 0
-	UnacceptableProtocolVersion                      = 1
-	IdentifierRejected                               = 2
-	ServerUnavailable                                = 3
-	BadUserNameOrPassword                            = 4
-	NotAuthorized                                    = 5
-)
-
-func (c ConnectionReturnCode) String() string {
-	switch c {
-	case ConnectionAccepted:
-		return "ConnectionAccepted"
-	case UnacceptableProtocolVersion:
-		return "Connection Refused, unacceptable protocol version"
-	case IdentifierRejected:
-		return "Connection Refused, identifier rejected"
-	case ServerUnavailable:
-		return "Connection Refused, Server unavailable"
-	case BadUserNameOrPassword:
-		return "Connection Refused, bad user name or password"
-	case NotAuthorized:
-		return "Connection Refused, not authorized"
-	}
-	return fmt.Sprintf("Unknown ConnectionReturnCode %x", int(c))
-}
-
-type ConnAck struct {
-	SessionPresent bool
-	Code           ConnectionReturnCode
-}
-
 type Client struct {
 	Transport   io.ReadWriteCloser
 	Handler     Handler
@@ -105,5 +72,11 @@ type Client struct {
 	RecvTimeout time.Duration
 	ConnState   func(ConnState)
 
+	sig signaller
+	mu  sync.RWMutex
+}
+
+type signaller struct {
 	chConnAck chan *ConnAck
+	chPubAck  map[uint16]chan *PubAck
 }

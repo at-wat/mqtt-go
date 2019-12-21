@@ -27,6 +27,24 @@ func TestIntegration_Connect(t *testing.T) {
 		t.Errorf("Connection was not accepted: %s", ack.Code)
 	}
 
+	err = cli.Publish(ctx, &Message{
+		Topic:   "test",
+		Payload: []byte("message"),
+	})
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	err = cli.Publish(ctx, &Message{
+		Topic:   "test",
+		QoS:     QoS1,
+		Payload: []byte("message"),
+		ID:      0x0123,
+	})
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
 	if err := cli.Disconnect(ctx); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
