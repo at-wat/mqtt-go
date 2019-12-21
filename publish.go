@@ -32,6 +32,9 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	default:
 		panic("invalid QoS")
 	}
+	if message.Dup {
+		pktHeader |= byte(publishFlagDup)
+	}
 	if message.ID != 0 {
 		panic("ID is set by user")
 	}
@@ -39,9 +42,6 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 
 	if message.QoS != QoS0 {
 		header = append(header, packUint16(id)...)
-	}
-	if message.Dup {
-		panic("Dup flag is set by user")
 	}
 	pkt := pack(pktHeader, header, message.Payload)
 
