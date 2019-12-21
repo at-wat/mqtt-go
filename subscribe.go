@@ -43,12 +43,12 @@ func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	pkt := pack(pktHeader, header, payload)
 
 	chSubAck := make(chan *pktSubAck, 1)
-	c.mu.Lock()
+	c.sig.mu.Lock()
 	if c.sig.chSubAck == nil {
 		c.sig.chSubAck = make(map[uint16]chan *pktSubAck)
 	}
 	c.sig.chSubAck[id] = chSubAck
-	c.mu.Unlock()
+	c.sig.mu.Unlock()
 
 	if err := c.write(pkt); err != nil {
 		return err

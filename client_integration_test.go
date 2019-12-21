@@ -225,12 +225,8 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 					b.Fatalf("Unexpected error: '%v'", err)
 				}
 
-				select {
-				case _, ok := <-chReceived:
-					if !ok {
-						b.Fatal("Connection closed unexpectedly")
-						break
-					}
+				if _, ok := <-chReceived; !ok {
+					b.Fatal("Connection closed unexpectedly")
 				}
 			}
 			b.StopTimer()

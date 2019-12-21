@@ -14,7 +14,7 @@ type Client struct {
 	RecvTimeout time.Duration
 	ConnState   func(ConnState, error)
 
-	sig        signaller
+	sig        *signaller
 	mu         sync.RWMutex
 	connState  ConnState
 	err        error
@@ -44,32 +44,73 @@ type signaller struct {
 	chPubComp  map[uint16]chan *pktPubComp
 	chSubAck   map[uint16]chan *pktSubAck
 	chUnsubAck map[uint16]chan *pktUnsubAck
+	mu         sync.RWMutex
 }
 
-func (s signaller) Copy() signaller {
-	var ret signaller
-	ret.chConnAck = s.chConnAck
-	ret.chPingResp = s.chPingResp
-	ret.chPubAck = make(map[uint16]chan *pktPubAck)
-	ret.chPubRec = make(map[uint16]chan *pktPubRec)
-	ret.chPubComp = make(map[uint16]chan *pktPubComp)
-	ret.chSubAck = make(map[uint16]chan *pktSubAck)
-	ret.chUnsubAck = make(map[uint16]chan *pktUnsubAck)
+func (s *signaller) ConnAck() chan *pktConnAck {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	for k, v := range s.chPubAck {
-		ret.chPubAck[k] = v
+	return s.chConnAck
+}
+func (s *signaller) PingResp() chan *pktPingResp {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.chPingResp
+}
+func (s *signaller) PubAck(id uint16) (chan *pktPubAck, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.chPubAck == nil {
+		return nil, false
 	}
-	for k, v := range s.chPubRec {
-		ret.chPubRec[k] = v
+	defer delete(s.chPubAck, id)
+	ch, ok := s.chPubAck[id]
+	return ch, ok
+}
+func (s *signaller) PubRec(id uint16) (chan *pktPubRec, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.chPubRec == nil {
+		return nil, false
 	}
-	for k, v := range s.chPubComp {
-		ret.chPubComp[k] = v
+	defer delete(s.chPubRec, id)
+	ch, ok := s.chPubRec[id]
+	return ch, ok
+}
+func (s *signaller) PubComp(id uint16) (chan *pktPubComp, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.chPubComp == nil {
+		return nil, false
 	}
-	for k, v := range s.chSubAck {
-		ret.chSubAck[k] = v
+	defer delete(s.chPubComp, id)
+	ch, ok := s.chPubComp[id]
+	return ch, ok
+}
+func (s *signaller) SubAck(id uint16) (chan *pktSubAck, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.chSubAck == nil {
+		return nil, false
 	}
-	for k, v := range s.chUnsubAck {
-		ret.chUnsubAck[k] = v
+	defer delete(s.chSubAck, id)
+	ch, ok := s.chSubAck[id]
+	return ch, ok
+}
+func (s *signaller) UnsubAck(id uint16) (chan *pktUnsubAck, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.chUnsubAck == nil {
+		return nil, false
 	}
-	return ret
+	defer delete(s.chUnsubAck, id)
+	ch, ok := s.chUnsubAck[id]
+	return ch, ok
 }

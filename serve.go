@@ -9,9 +9,10 @@ func (c *Client) serve() error {
 		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
 	}()
+	r := c.Transport
 	for {
 		pktTypeBytes := make([]byte, 1)
-		if _, err := io.ReadFull(c.Transport, pktTypeBytes); err != nil {
+		if _, err := io.ReadFull(r, pktTypeBytes); err != nil {
 			return err
 		}
 		pktType := packetType(pktTypeBytes[0] & 0xF0)
@@ -19,7 +20,7 @@ func (c *Client) serve() error {
 		var remainingLength int
 		for {
 			b := make([]byte, 1)
-			if _, err := io.ReadFull(c.Transport, b); err != nil {
+			if _, err := io.ReadFull(r, b); err != nil {
 				return err
 			}
 			remainingLength = (remainingLength << 7) | (int(b[0]) & 0x7F)
@@ -28,19 +29,15 @@ func (c *Client) serve() error {
 			}
 		}
 		contents := make([]byte, remainingLength)
-		if _, err := io.ReadFull(c.Transport, contents); err != nil {
+		if _, err := io.ReadFull(r, contents); err != nil {
 			return err
 		}
 		// fmt.Printf("%s: %v\n", pktType, contents)
 
-		c.mu.RLock()
-		sig := c.sig.Copy()
-		c.mu.RUnlock()
-
 		switch pktType {
 		case packetConnAck:
 			select {
-			case sig.chConnAck <- (&pktConnAck{}).parse(pktFlag, contents):
+			case c.sig.ConnAck() <- (&pktConnAck{}).parse(pktFlag, contents):
 			default:
 			}
 		case packetPublish:
@@ -67,18 +64,18 @@ func (c *Client) serve() error {
 				}
 			}
 		case packetPubAck:
-			if sig.chPubAck != nil {
-				pubAck := (&pktPubAck{}).parse(pktFlag, contents)
+			pubAck := (&pktPubAck{}).parse(pktFlag, contents)
+			if ch, ok := c.sig.PubAck(pubAck.ID); ok {
 				select {
-				case sig.chPubAck[pubAck.ID] <- pubAck:
+				case ch <- pubAck:
 				default:
 				}
 			}
 		case packetPubRec:
-			if sig.chPubRec != nil {
-				pubRec := (&pktPubRec{}).parse(pktFlag, contents)
+			pubRec := (&pktPubRec{}).parse(pktFlag, contents)
+			if ch, ok := c.sig.PubRec(pubRec.ID); ok {
 				select {
-				case sig.chPubRec[pubRec.ID] <- pubRec:
+				case ch <- pubRec:
 				default:
 				}
 			}
@@ -92,33 +89,33 @@ func (c *Client) serve() error {
 				return err
 			}
 		case packetPubComp:
-			if sig.chPubComp != nil {
-				pubComp := (&pktPubComp{}).parse(pktFlag, contents)
+			pubComp := (&pktPubComp{}).parse(pktFlag, contents)
+			if ch, ok := c.sig.PubComp(pubComp.ID); ok {
 				select {
-				case sig.chPubComp[pubComp.ID] <- pubComp:
+				case ch <- pubComp:
 				default:
 				}
 			}
 		case packetSubAck:
-			if sig.chSubAck != nil {
-				subAck := (&pktSubAck{}).parse(pktFlag, contents)
+			subAck := (&pktSubAck{}).parse(pktFlag, contents)
+			if ch, ok := c.sig.SubAck(subAck.ID); ok {
 				select {
-				case sig.chSubAck[subAck.ID] <- subAck:
+				case ch <- subAck:
 				default:
 				}
 			}
 		case packetUnsubAck:
-			if sig.chUnsubAck != nil {
-				unsubAck := (&pktUnsubAck{}).parse(pktFlag, contents)
+			unsubAck := (&pktUnsubAck{}).parse(pktFlag, contents)
+			if ch, ok := c.sig.UnsubAck(unsubAck.ID); ok {
 				select {
-				case sig.chUnsubAck[unsubAck.ID] <- unsubAck:
+				case ch <- unsubAck:
 				default:
 				}
 			}
 		case packetPingResp:
 			pingResp := (&pktPingResp{}).parse(pktFlag, contents)
 			select {
-			case sig.chPingResp <- pingResp:
+			case c.sig.PingResp() <- pingResp:
 			default:
 			}
 		}

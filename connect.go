@@ -34,6 +34,7 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 			return err
 		}
 	}
+	c.sig = &signaller{}
 
 	payload := packString(clientID)
 
