@@ -43,6 +43,9 @@ func (c *Client) Serve() error {
 			}
 		case packetPublish:
 			publish := (&Publish{}).parse(pktFlag, contents)
+			if c.Handler != nil {
+				c.Handler.Serve(&publish.Message)
+			}
 			switch publish.Message.QoS {
 			case QoS1:
 				pktPubAck := pack(packetPubAck|packetFromClient, packUint16(publish.Message.ID))

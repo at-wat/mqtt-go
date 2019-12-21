@@ -3,6 +3,7 @@
 package mqtt
 
 import (
+	"bytes"
 	"context"
 	"testing"
 )
@@ -128,6 +129,11 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
+	chReceived := make(chan *Message, 100)
+	cli.Handler = HandlerFunc(func(msg *Message) {
+		chReceived <- msg
+	})
+
 	err = cli.Subscribe(ctx, []*Message{
 		{
 			Topic: "test",
@@ -145,6 +151,16 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	select {
+	case msg := <-chReceived:
+		if msg.Topic != "test" {
+			t.Errorf("Expected topic name of 'test', got '%s'", msg.Topic)
+		}
+		if !bytes.Equal(msg.Payload, []byte("message")) {
+			t.Errorf("Expected payload of '%v', got '%v'", []byte("message"), msg.Payload)
+		}
 	}
 
 	if err := cli.Disconnect(ctx); err != nil {

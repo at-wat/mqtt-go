@@ -124,5 +124,5 @@ func unpackUint16(b []byte) (int, uint16) {
 
 func unpackString(b []byte) (int, string) {
 	nHeader, n := unpackUint16(b)
-	return int(n) + nHeader, string(b[nHeader:int(n)])
+	return int(n) + nHeader, string(b[nHeader : int(n)+nHeader])
 }
