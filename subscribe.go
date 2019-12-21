@@ -5,6 +5,7 @@ import (
 	"errors"
 )
 
+// ErrInvalidSubAck means that the incomming SUBACK packet is inconsistent with the request.
 var ErrInvalidSubAck = errors.New("invalid SUBACK")
 
 type subscribeFlag byte

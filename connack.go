@@ -4,8 +4,10 @@ import (
 	"fmt"
 )
 
+// ConnectionReturnCode represents return code of connect request.
 type ConnectionReturnCode byte
 
+// Connection acceptance/rejection code.
 const (
 	ConnectionAccepted          ConnectionReturnCode = 0
 	UnacceptableProtocolVersion ConnectionReturnCode = 1

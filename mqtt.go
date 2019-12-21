@@ -7,13 +7,15 @@ import (
 	"time"
 )
 
+// QoS represents quality of service level.
 type QoS uint8
 
+// QoS values.
 const (
-	QoS0             QoS = 0x00
-	QoS1             QoS = 0x01
-	QoS2             QoS = 0x02
-	SubscribeFailure QoS = 0x80
+	QoS0             QoS = 0x00 // At most once delivery
+	QoS1             QoS = 0x01 // At least once delivery
+	QoS2             QoS = 0x02 // Exactly once delivery
+	SubscribeFailure QoS = 0x80 // Rejected to subscribe
 )
 
 type Message struct {
@@ -59,13 +61,15 @@ type Handler interface {
 	Serve(*Message)
 }
 
+// ConnState represents the status of MQTT connection.
 type ConnState int
 
+// ConnState values.
 const (
-	StateNew ConnState = iota
-	StateActive
-	StateClosed
-	StateDisconnected
+	StateNew          ConnState = iota // initial state
+	StateActive                        // connected to the broker
+	StateClosed                        // connection is unexpectedly closed
+	StateDisconnected                  // connection is expectedly closed
 )
 
 type Client struct {

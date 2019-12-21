@@ -5,8 +5,6 @@ import (
 	"errors"
 )
 
-var ErrInvalidUnsubAck = errors.New("invalid SUBACK")
-
 func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 
