@@ -92,6 +92,13 @@ func (c *Client) Serve() error {
 				case sig.chSubAck[subAck.ID] <- subAck:
 				}
 			}
+		case packetUnsubAck:
+			if sig.chUnsubAck != nil {
+				unsubAck := (&UnsubAck{}).parse(pktFlag, contents)
+				select {
+				case sig.chUnsubAck[unsubAck.ID] <- unsubAck:
+				}
+			}
 		}
 	}
 }

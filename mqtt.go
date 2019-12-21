@@ -78,9 +78,10 @@ type Client struct {
 }
 
 type signaller struct {
-	chConnAck chan *ConnAck
-	chPubAck  map[uint16]chan *PubAck
-	chPubRec  map[uint16]chan *PubRec
-	chPubComp map[uint16]chan *PubComp
-	chSubAck  map[uint16]chan *SubAck
+	chConnAck  chan *ConnAck
+	chPubAck   map[uint16]chan *PubAck
+	chPubRec   map[uint16]chan *PubRec
+	chPubComp  map[uint16]chan *PubComp
+	chSubAck   map[uint16]chan *SubAck
+	chUnsubAck map[uint16]chan *UnsubAck
 }
