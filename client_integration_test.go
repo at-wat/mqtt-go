@@ -24,6 +24,22 @@ func TestIntegration_Connect(t *testing.T) {
 	}
 }
 
+func TestIntegration_ConnectWebSocket(t *testing.T) {
+	cli, err := Dial("ws://localhost:9001")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx := context.Background()
+	if err := cli.Connect(ctx, "Client1"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+}
+
 func TestIntegration_PublishQoS0(t *testing.T) {
 	cli, err := Dial("mqtt://localhost:1883")
 	if err != nil {

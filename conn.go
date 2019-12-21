@@ -2,8 +2,11 @@ package mqtt
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
+
+	"golang.org/x/net/websocket"
 )
 
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
@@ -22,6 +25,44 @@ func Dial(urlStr string) (*Client, error) {
 			return nil, err
 		}
 		c.Transport = conn
+	case "ws":
+		wsc, err := websocket.NewConfig(
+			fmt.Sprintf("ws://%s:%s%s", u.Hostname(), u.Port(), u.EscapedPath()), "ws://")
+		if err != nil {
+			return nil, err
+		}
+		wsc.Protocol = append(wsc.Protocol, "mqtt")
+		ws, err := websocket.DialConfig(wsc)
+		if err != nil {
+			return nil, err
+		}
+		var p net.Conn
+		p, c.Transport = net.Pipe()
+		go func() {
+			for {
+				var b []byte
+				if err := websocket.Message.Receive(ws, &b); err != nil {
+					p.Close()
+					return
+				}
+				if _, err := p.Write(b); err != nil {
+					return
+				}
+			}
+		}()
+		go func() {
+			b := make([]byte, 1024)
+			for {
+				n, err := p.Read(b)
+				if err != nil {
+					return
+				}
+				if err := websocket.Message.Send(ws, b[:n]); err != nil {
+					p.Close()
+					return
+				}
+			}
+		}()
 	default:
 		return nil, ErrUnsupportedProtocol
 	}
