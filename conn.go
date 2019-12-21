@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -16,26 +17,72 @@ var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 var ErrClosedTransport = errors.New("read/write on closed transport")
 
 // Dial creates MQTT client using URL string.
-func Dial(urlStr string) (*Client, error) {
+func Dial(urlStr string, opts ...DialOption) (*Client, error) {
+	o := &DialOptions{
+		Dialer: &net.Dialer{},
+	}
+	for _, opt := range opts {
+		if err := opt(o); err != nil {
+			return nil, err
+		}
+	}
+	return o.dial(urlStr)
+}
+
+// DialOption sets option for Dial.
+type DialOption func(*DialOptions) error
+
+// DialOptions stores options for Dial.
+type DialOptions struct {
+	Dialer    *net.Dialer
+	TLSConfig *tls.Config
+}
+
+// WithDialer sets dialer.
+func WithDialer(dialer *net.Dialer) DialOption {
+	return func(o *DialOptions) error {
+		o.Dialer = dialer
+		return nil
+	}
+}
+
+// WithTLSConfig sets TLS configuration.
+func WithTLSConfig(config *tls.Config) DialOption {
+	return func(o *DialOptions) error {
+		o.TLSConfig = config
+		return nil
+	}
+}
+
+func (d *DialOptions) dial(urlStr string) (*Client, error) {
 	c := &Client{}
+
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 	switch u.Scheme {
 	case "tcp", "mqtt":
-		conn, err := net.Dial("tcp", u.Host)
+		conn, err := d.Dialer.Dial("tcp", u.Host)
 		if err != nil {
 			return nil, err
 		}
 		c.Transport = conn
-	case "ws":
+	case "tls", "mqtts":
+		conn, err := tls.DialWithDialer(d.Dialer, "tcp", u.Host, d.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
+		c.Transport = conn
+	case "ws", "wss":
 		wsc, err := websocket.NewConfig(
-			fmt.Sprintf("ws://%s:%s%s", u.Hostname(), u.Port(), u.EscapedPath()), "ws://")
+			fmt.Sprintf("%s://%s:%s%s", u.Scheme, u.Hostname(), u.Port(), u.EscapedPath()), "ws://")
 		if err != nil {
 			return nil, err
 		}
 		wsc.Protocol = append(wsc.Protocol, "mqtt")
+		wsc.Dialer = d.Dialer
+		wsc.TlsConfig = d.TLSConfig
 		ws, err := websocket.DialConfig(wsc)
 		if err != nil {
 			return nil, err
@@ -79,7 +126,6 @@ func Dial(urlStr string) (*Client, error) {
 		c.err = err
 		c.mu.Unlock()
 	}()
-
 	return c, nil
 }
 

@@ -4,6 +4,11 @@ services:
     image: eclipse-mosquitto:1.6
     ports:
       - 1883:1883
+      - 8883:8883
       - 9001:9001
+      - 9443:9443
     volumes:
       - ./integration/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./integration/test.crt:/test.crt:ro
+      - ./integration/test.key:/test.key:ro
+      - ./integration/ca.crt:/ca.crt:ro

@@ -5,6 +5,7 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"testing"
 )
 
@@ -24,8 +25,44 @@ func TestIntegration_Connect(t *testing.T) {
 	}
 }
 
+func TestIntegration_ConnectTLS(t *testing.T) {
+	cli, err := Dial("tls://localhost:8883",
+		WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx := context.Background()
+	if err := cli.Connect(ctx, "Client1"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+}
+
 func TestIntegration_ConnectWebSocket(t *testing.T) {
 	cli, err := Dial("ws://localhost:9001")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx := context.Background()
+	if err := cli.Connect(ctx, "Client1"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+}
+
+func TestIntegration_ConnectWebSockets(t *testing.T) {
+	cli, err := Dial("wss://localhost:9443",
+		WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+	)
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
