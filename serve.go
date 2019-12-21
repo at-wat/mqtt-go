@@ -41,6 +41,22 @@ func (c *Client) Serve() error {
 			select {
 			case sig.chConnAck <- (&ConnAck{}).parse(pktFlag, contents):
 			}
+		case packetPublish:
+			publish := (&Publish{}).parse(pktFlag, contents)
+			switch publish.Message.QoS {
+			case QoS1:
+				pktPubAck := pack(packetPubAck|packetFromClient, packUint16(publish.Message.ID))
+				_, err := c.Transport.Write(pktPubAck)
+				if err != nil {
+					return err
+				}
+			case QoS2:
+				pktPubRec := pack(packetPubRec|packetFromClient, packUint16(publish.Message.ID))
+				_, err := c.Transport.Write(pktPubRec)
+				if err != nil {
+					return err
+				}
+			}
 		case packetPubAck:
 			if sig.chPubAck != nil {
 				pubAck := (&PubAck{}).parse(pktFlag, contents)
@@ -54,6 +70,13 @@ func (c *Client) Serve() error {
 				select {
 				case sig.chPubRec[pubRec.ID] <- pubRec:
 				}
+			}
+		case packetPubRel:
+			pubRel := (&PubRel{}).parse(pktFlag, contents)
+			pktPubComp := pack(packetPubComp|packetFromClient, packUint16(pubRel.ID))
+			_, err := c.Transport.Write(pktPubComp)
+			if err != nil {
+				return err
 			}
 		case packetPubComp:
 			if sig.chPubComp != nil {

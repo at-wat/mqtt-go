@@ -17,7 +17,7 @@ const (
 )
 
 func (c *Client) Subscribe(ctx context.Context, messages []*Message) error {
-	pktHeader := byte(packetSubscribe)
+	pktHeader := byte(packetSubscribe | packetFromClient)
 
 	id := newID()
 	header := packUint16(id)

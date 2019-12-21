@@ -7,11 +7,12 @@ import (
 type publishFlag byte
 
 const (
-	publishFlagRetain publishFlag = 0x01
-	publishFlagQoS0               = 0x00
-	publishFlagQoS1               = 0x02
-	publishFlagQoS2               = 0x04
-	publishFlagDup                = 0x08
+	publishFlagRetain  publishFlag = 0x01
+	publishFlagQoS0                = 0x00
+	publishFlagQoS1                = 0x02
+	publishFlagQoS2                = 0x04
+	publishFlagQoSMask             = 0x06
+	publishFlagDup                 = 0x08
 )
 
 func (c *Client) Publish(ctx context.Context, message *Message) error {
@@ -88,7 +89,7 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 			return ctx.Err()
 		case <-chPubRec:
 		}
-		pktPubRel := pack(packetPubRel, packUint16(id))
+		pktPubRel := pack(packetPubRel|packetFromClient, packUint16(id))
 		_, err := c.Transport.Write(pktPubRel)
 		if err != nil {
 			return err
@@ -100,4 +101,28 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 		}
 	}
 	return nil
+}
+
+type Publish struct {
+	Message
+}
+
+func (p *Publish) parse(flag byte, contents []byte) *Publish {
+	p.Message.Dup = (publishFlag(flag) & publishFlagDup) != 0
+	p.Message.Retain = (publishFlag(flag) & publishFlagRetain) != 0
+	switch publishFlag(flag) & publishFlagQoSMask {
+	case publishFlagQoS0:
+		p.Message.QoS = QoS0
+	case publishFlagQoS1:
+		p.Message.QoS = QoS1
+	case publishFlagQoS2:
+		p.Message.QoS = QoS2
+	}
+
+	var n, nID int
+	n, p.Message.Topic = unpackString(contents)
+	nID, p.Message.ID = unpackUint16(contents[n:])
+	p.Message.Payload = contents[n+nID:]
+
+	return p
 }

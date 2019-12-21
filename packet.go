@@ -12,15 +12,16 @@ const (
 	packetPublish                = 0x30
 	packetPubAck                 = 0x40
 	packetPubRec                 = 0x50
-	packetPubRel                 = 0x62
+	packetPubRel                 = 0x60
 	packetPubComp                = 0x70
-	packetSubscribe              = 0x82
+	packetSubscribe              = 0x80
 	packetSubAck                 = 0x90
 	packetUnsubscribe            = 0xA0
 	packetUnsubAck               = 0xB0
 	packetPingReq                = 0xC0
 	packetPingResp               = 0xD0
 	packetDisconnect             = 0xE0
+	packetFromClient             = 0x02
 )
 
 func (t packetType) String() string {
@@ -115,4 +116,13 @@ func packUint16(v uint16) []byte {
 		byte(v >> 8),
 		byte(v),
 	}
+}
+
+func unpackUint16(b []byte) (int, uint16) {
+	return 2, uint16(b[0])<<8 | uint16(b[1])
+}
+
+func unpackString(b []byte) (int, string) {
+	nHeader, n := unpackUint16(b)
+	return int(n) + nHeader, string(b[nHeader:int(n)])
 }
