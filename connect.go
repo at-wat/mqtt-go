@@ -24,6 +24,7 @@ const (
 	connectFlagUserName     connectFlag = 0x80
 )
 
+// Connect to the broker.
 func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
 	o := &ConnectOptions{
 		KeepAlive: 60,

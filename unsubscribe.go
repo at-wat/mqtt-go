@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// Unsubscribe topics.
 func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 

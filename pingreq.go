@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// Ping to the broker.
 func (c *Client) Ping(ctx context.Context) error {
 	pkt := pack(packetPingReq.b())
 

@@ -44,7 +44,7 @@ func (c *Client) serve() error {
 			default:
 			}
 		case packetPublish:
-			publish := (&Publish{}).parse(pktFlag, contents)
+			publish := (&pktPublish{}).parse(pktFlag, contents)
 			if c.Handler != nil {
 				c.Handler.Serve(&publish.Message)
 			}
@@ -85,7 +85,7 @@ func (c *Client) serve() error {
 				}
 			}
 		case packetPubRel:
-			pubRel := (&PubRel{}).parse(pktFlag, contents)
+			pubRel := (&pktPubRel{}).parse(pktFlag, contents)
 			pktPubComp := pack(
 				packetPubComp.b()|packetFromClient.b(),
 				packUint16(pubRel.ID),
@@ -126,8 +126,4 @@ func (c *Client) serve() error {
 			}
 		}
 	}
-}
-
-func (c *Client) Stop() error {
-	return c.Transport.Close()
 }

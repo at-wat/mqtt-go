@@ -97,3 +97,8 @@ func (c *Client) connStateUpdate(newState ConnState) {
 		c.ConnState(state, err)
 	}
 }
+
+// Close force closes MQTT connection.
+func (c *Client) Close() error {
+	return c.Transport.Close()
+}

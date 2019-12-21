@@ -15,6 +15,7 @@ const (
 	publishFlagDup     publishFlag = 0x08
 )
 
+// Publish a message to the broker.
 func (c *Client) Publish(ctx context.Context, message *Message) error {
 	pktHeader := packetPublish.b()
 	header := packString(message.Topic)
@@ -109,11 +110,11 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	return nil
 }
 
-type Publish struct {
+type pktPublish struct {
 	Message
 }
 
-func (p *Publish) parse(flag byte, contents []byte) *Publish {
+func (p *pktPublish) parse(flag byte, contents []byte) *pktPublish {
 	p.Message.Dup = (publishFlag(flag) & publishFlagDup) != 0
 	p.Message.Retain = (publishFlag(flag) & publishFlagRetain) != 0
 	switch publishFlag(flag) & publishFlagQoSMask {

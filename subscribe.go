@@ -16,6 +16,7 @@ const (
 	subscribeFlagQoS2 subscribeFlag = 0x02
 )
 
+// Subscribe topics.
 func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	pktHeader := byte(packetSubscribe | packetFromClient)
 

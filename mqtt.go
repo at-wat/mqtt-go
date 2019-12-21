@@ -18,6 +18,7 @@ const (
 	SubscribeFailure QoS = 0x80 // Rejected to subscribe
 )
 
+// Message represents MQTT message.
 type Message struct {
 	Topic   string
 	ID      uint16
@@ -27,11 +28,13 @@ type Message struct {
 	Payload []byte
 }
 
+// Subscription represents MQTT subscription target.
 type Subscription struct {
 	Topic string
 	QoS   QoS
 }
 
+// ConnectOptions represents options for Connect.
 type ConnectOptions struct {
 	UserName     string
 	Password     string
@@ -40,8 +43,10 @@ type ConnectOptions struct {
 	Will         *Message
 }
 
+// ConnectOption sets option for Connect.
 type ConnectOption func(*ConnectOptions) error
 
+// CommandClient is the interface of MQTT client.
 type CommandClient interface {
 	Connect(ctx context.Context, clientID string, opts ...ConnectOption) error
 	Disconnect(ctx context.Context) error
@@ -51,12 +56,15 @@ type CommandClient interface {
 	Ping(ctx context.Context) error
 }
 
+// HandlerFunc type is an adapter to use functions as MQTT message handler.
 type HandlerFunc func(*Message)
 
+// Serve calls h(message).
 func (h HandlerFunc) Serve(message *Message) {
 	h(message)
 }
 
+// Handler receives an MQTT message.
 type Handler interface {
 	Serve(*Message)
 }
@@ -72,6 +80,7 @@ const (
 	StateDisconnected                  // connection is expectedly closed
 )
 
+// Client is an MQTT client.
 type Client struct {
 	Transport   io.ReadWriteCloser
 	Handler     Handler

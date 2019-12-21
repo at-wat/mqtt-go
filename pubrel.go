@@ -1,10 +1,10 @@
 package mqtt
 
-type PubRel struct {
+type pktPubRel struct {
 	ID uint16
 }
 
-func (p *PubRel) parse(flag byte, contents []byte) *PubRel {
+func (p *pktPubRel) parse(flag byte, contents []byte) *pktPubRel {
 	_, p.ID = unpackUint16(contents)
 	return p
 }
