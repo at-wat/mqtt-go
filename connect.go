@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 )
 
 type protocolLevel byte
@@ -25,13 +26,13 @@ const (
 
 const connectFlagWillQoSBit = 3
 
-func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (*ConnAck, error) {
+func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
 	o := &ConnectOptions{
 		KeepAlive: 60,
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -84,12 +85,15 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 	c.mu.Unlock()
 	_, err := c.Transport.Write(pkt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
-	case ack := <-chConnAck:
-		return ack, nil
+		return ctx.Err()
+	case connAck := <-chConnAck:
+		if connAck.Code != ConnectionAccepted {
+			return errors.New(connAck.Code.String())
+		}
 	}
+	return nil
 }

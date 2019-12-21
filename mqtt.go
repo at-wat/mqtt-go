@@ -10,9 +10,10 @@ import (
 type QoS uint8
 
 const (
-	QoS0 QoS = 0
-	QoS1     = 1
-	QoS2     = 2
+	QoS0             QoS = 0x00
+	QoS1                 = 0x01
+	QoS2                 = 0x02
+	SubscribeFailure     = 0x80
 )
 
 type Message struct {
@@ -40,7 +41,7 @@ type ConnectOptions struct {
 type ConnectOption func(*ConnectOptions) error
 
 type CommandClient interface {
-	Connect(ctx context.Context, clientID string, opts ...ConnectOption) (*ConnAck, error)
+	Connect(ctx context.Context, clientID string, opts ...ConnectOption) error
 	Disconnect(ctx context.Context) error
 	Publish(ctx context.Context, message *Message) error
 	Subscribe(ctx context.Context, subs ...*Subscription) error
@@ -79,4 +80,7 @@ type Client struct {
 type signaller struct {
 	chConnAck chan *ConnAck
 	chPubAck  map[uint16]chan *PubAck
+	chPubRec  map[uint16]chan *PubRec
+	chPubComp map[uint16]chan *PubComp
+	chSubAck  map[uint16]chan *SubAck
 }

@@ -12,9 +12,9 @@ const (
 	packetPublish                = 0x30
 	packetPubAck                 = 0x40
 	packetPubRec                 = 0x50
-	packetPubRel                 = 0x60
+	packetPubRel                 = 0x62
 	packetPubComp                = 0x70
-	packetSubscribe              = 0x80
+	packetSubscribe              = 0x82
 	packetSubAck                 = 0x90
 	packetUnsubscribe            = 0xA0
 	packetUnsubAck               = 0xB0

@@ -6,6 +6,8 @@ import (
 )
 
 func (c *Client) Serve() error {
+	defer func() {
+	}()
 	for {
 		pktTypeBytes := make([]byte, 1)
 		if _, err := io.ReadFull(c.Transport, pktTypeBytes); err != nil {
@@ -44,6 +46,27 @@ func (c *Client) Serve() error {
 				pubAck := (&PubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubAck[pubAck.ID] <- pubAck:
+				}
+			}
+		case packetPubRec:
+			if sig.chPubRec != nil {
+				pubRec := (&PubRec{}).parse(pktFlag, contents)
+				select {
+				case sig.chPubRec[pubRec.ID] <- pubRec:
+				}
+			}
+		case packetPubComp:
+			if sig.chPubComp != nil {
+				pubComp := (&PubComp{}).parse(pktFlag, contents)
+				select {
+				case sig.chPubComp[pubComp.ID] <- pubComp:
+				}
+			}
+		case packetSubAck:
+			if sig.chSubAck != nil {
+				subAck := (&SubAck{}).parse(pktFlag, contents)
+				select {
+				case sig.chSubAck[subAck.ID] <- subAck:
 				}
 			}
 		}

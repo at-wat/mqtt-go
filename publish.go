@@ -31,33 +31,72 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	default:
 		panic("invalid QoS")
 	}
+	if message.ID != 0 {
+		panic("ID is set by user")
+	}
+	id := newID()
+
 	if message.QoS != QoS0 {
-		header = append(header, packUint16(message.ID)...)
+		header = append(header, packUint16(id)...)
 	}
 	if message.Dup {
 		panic("Dup flag is set by user")
 	}
 	pkt := pack(pktHeader, header, message.Payload)
 
-	chPubAck := make(chan *PubAck)
-	if message.QoS != QoS0 {
+	var chPubAck chan *PubAck
+	var chPubRec chan *PubRec
+	var chPubComp chan *PubComp
+	switch message.QoS {
+	case QoS1:
+		chPubAck = make(chan *PubAck)
 		c.mu.Lock()
 		if c.sig.chPubAck == nil {
 			c.sig.chPubAck = make(map[uint16]chan *PubAck)
 		}
-		c.sig.chPubAck[message.ID] = chPubAck
+		c.sig.chPubAck[id] = chPubAck
+		c.mu.Unlock()
+	case QoS2:
+		chPubRec = make(chan *PubRec)
+		chPubComp = make(chan *PubComp)
+		c.mu.Lock()
+		if c.sig.chPubRec == nil {
+			c.sig.chPubRec = make(map[uint16]chan *PubRec)
+		}
+		c.sig.chPubRec[id] = chPubRec
+		if c.sig.chPubComp == nil {
+			c.sig.chPubComp = make(map[uint16]chan *PubComp)
+		}
+		c.sig.chPubComp[id] = chPubComp
 		c.mu.Unlock()
 	}
+
 	_, err := c.Transport.Write(pkt)
 	if err != nil {
 		return err
 	}
-	if message.QoS != QoS0 {
+	switch message.QoS {
+	case QoS1:
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-chPubAck:
-			return nil
+		}
+	case QoS2:
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-chPubRec:
+		}
+		pktPubRel := pack(packetPubRel, packUint16(id))
+		_, err := c.Transport.Write(pktPubRel)
+		if err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-chPubComp:
 		}
 	}
 	return nil
