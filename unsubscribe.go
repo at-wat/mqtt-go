@@ -2,7 +2,6 @@ package mqtt
 
 import (
 	"context"
-	"errors"
 )
 
 func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
