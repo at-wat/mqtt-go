@@ -1,7 +1,6 @@
 package mqtt
 
 import (
-	"fmt"
 	"io"
 )
 
@@ -47,7 +46,7 @@ func (c *Client) Serve() error {
 		if _, err := io.ReadFull(c.Transport, contents); err != nil {
 			return err
 		}
-		fmt.Printf("%s: %v\n", pktType, contents)
+		// fmt.Printf("%s: %v\n", pktType, contents)
 
 		c.mu.RLock()
 		sig := c.sig.Copy()
