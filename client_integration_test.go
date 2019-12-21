@@ -206,7 +206,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 				}
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
