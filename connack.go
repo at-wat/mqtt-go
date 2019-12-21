@@ -8,11 +8,11 @@ type ConnectionReturnCode byte
 
 const (
 	ConnectionAccepted          ConnectionReturnCode = 0
-	UnacceptableProtocolVersion                      = 1
-	IdentifierRejected                               = 2
-	ServerUnavailable                                = 3
-	BadUserNameOrPassword                            = 4
-	NotAuthorized                                    = 5
+	UnacceptableProtocolVersion ConnectionReturnCode = 1
+	IdentifierRejected          ConnectionReturnCode = 2
+	ServerUnavailable           ConnectionReturnCode = 3
+	BadUserNameOrPassword       ConnectionReturnCode = 4
+	NotAuthorized               ConnectionReturnCode = 5
 )
 
 func (c ConnectionReturnCode) String() string {

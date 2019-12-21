@@ -6,7 +6,7 @@ import (
 
 func (c *Client) Disconnect(ctx context.Context) error {
 	pkt := pack(
-		byte(packetDisconnect),
+		packetDisconnect.b(),
 		[]byte{},
 		[]byte{},
 	)

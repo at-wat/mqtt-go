@@ -10,10 +10,9 @@ var ErrInvalidSubAck = errors.New("invalid SUBACK")
 type subscribeFlag byte
 
 const (
-	subscribeFlagQoS0    = 0x00
-	subscribeFlagQoS1    = 0x01
-	subscribeFlagQoS2    = 0x02
-	subscribeFlagFailure = 0x80
+	subscribeFlagQoS0 subscribeFlag = 0x00
+	subscribeFlagQoS1 subscribeFlag = 0x01
+	subscribeFlagQoS2 subscribeFlag = 0x02
 )
 
 func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
@@ -41,8 +40,7 @@ func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	}
 	pkt := pack(pktHeader, header, payload)
 
-	var chSubAck chan *pktSubAck
-	chSubAck = make(chan *pktSubAck)
+	chSubAck := make(chan *pktSubAck)
 	c.mu.Lock()
 	if c.sig.chSubAck == nil {
 		c.sig.chSubAck = make(map[uint16]chan *pktSubAck)

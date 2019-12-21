@@ -5,11 +5,9 @@ import (
 )
 
 func (c *Client) Ping(ctx context.Context) error {
-	pktHeader := byte(packetPingReq)
-	pkt := pack(pktHeader)
+	pkt := pack(packetPingReq.b())
 
-	var chPingResp chan *pktPingResp
-	chPingResp = make(chan *pktPingResp)
+	chPingResp := make(chan *pktPingResp)
 	c.mu.Lock()
 	c.sig.chPingResp = chPingResp
 	c.mu.Unlock()

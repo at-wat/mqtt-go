@@ -5,6 +5,6 @@ type pktPubComp struct {
 }
 
 func (p *pktPubComp) parse(flag byte, contents []byte) *pktPubComp {
-	p.ID = (uint16(contents[0]) << 8) | uint16(contents[1])
+	_, p.ID = unpackUint16(contents)
 	return p
 }

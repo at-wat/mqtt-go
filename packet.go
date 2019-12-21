@@ -8,21 +8,25 @@ type packetType byte
 
 const (
 	packetConnect     packetType = 0x10
-	packetConnAck                = 0x20
-	packetPublish                = 0x30
-	packetPubAck                 = 0x40
-	packetPubRec                 = 0x50
-	packetPubRel                 = 0x60
-	packetPubComp                = 0x70
-	packetSubscribe              = 0x80
-	packetSubAck                 = 0x90
-	packetUnsubscribe            = 0xA0
-	packetUnsubAck               = 0xB0
-	packetPingReq                = 0xC0
-	packetPingResp               = 0xD0
-	packetDisconnect             = 0xE0
-	packetFromClient             = 0x02
+	packetConnAck     packetType = 0x20
+	packetPublish     packetType = 0x30
+	packetPubAck      packetType = 0x40
+	packetPubRec      packetType = 0x50
+	packetPubRel      packetType = 0x60
+	packetPubComp     packetType = 0x70
+	packetSubscribe   packetType = 0x80
+	packetSubAck      packetType = 0x90
+	packetUnsubscribe packetType = 0xA0
+	packetUnsubAck    packetType = 0xB0
+	packetPingReq     packetType = 0xC0
+	packetPingResp    packetType = 0xD0
+	packetDisconnect  packetType = 0xE0
+	packetFromClient  packetType = 0x02
 )
+
+func (t packetType) b() byte {
+	return byte(t)
+}
 
 func (t packetType) String() string {
 	switch t {

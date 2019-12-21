@@ -8,15 +8,15 @@ type publishFlag byte
 
 const (
 	publishFlagRetain  publishFlag = 0x01
-	publishFlagQoS0                = 0x00
-	publishFlagQoS1                = 0x02
-	publishFlagQoS2                = 0x04
-	publishFlagQoSMask             = 0x06
-	publishFlagDup                 = 0x08
+	publishFlagQoS0    publishFlag = 0x00
+	publishFlagQoS1    publishFlag = 0x02
+	publishFlagQoS2    publishFlag = 0x04
+	publishFlagQoSMask publishFlag = 0x06
+	publishFlagDup     publishFlag = 0x08
 )
 
 func (c *Client) Publish(ctx context.Context, message *Message) error {
-	pktHeader := byte(packetPublish)
+	pktHeader := packetPublish.b()
 	header := packString(message.Topic)
 
 	if message.Retain {
@@ -93,7 +93,7 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 			return ctx.Err()
 		case <-chPubRec:
 		}
-		pktPubRel := pack(packetPubRel|packetFromClient, packUint16(id))
+		pktPubRel := pack(packetPubRel.b()|packetFromClient.b(), packUint16(id))
 		_, err := c.Transport.Write(pktPubRel)
 		if err != nil {
 			return err

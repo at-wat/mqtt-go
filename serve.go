@@ -41,6 +41,7 @@ func (c *Client) serve() error {
 		case packetConnAck:
 			select {
 			case sig.chConnAck <- (&pktConnAck{}).parse(pktFlag, contents):
+			default:
 			}
 		case packetPublish:
 			publish := (&Publish{}).parse(pktFlag, contents)
@@ -49,13 +50,19 @@ func (c *Client) serve() error {
 			}
 			switch publish.Message.QoS {
 			case QoS1:
-				pktPubAck := pack(packetPubAck|packetFromClient, packUint16(publish.Message.ID))
+				pktPubAck := pack(
+					packetPubAck.b()|packetFromClient.b(),
+					packUint16(publish.Message.ID),
+				)
 				_, err := c.Transport.Write(pktPubAck)
 				if err != nil {
 					return err
 				}
 			case QoS2:
-				pktPubRec := pack(packetPubRec|packetFromClient, packUint16(publish.Message.ID))
+				pktPubRec := pack(
+					packetPubRec.b()|packetFromClient.b(),
+					packUint16(publish.Message.ID),
+				)
 				_, err := c.Transport.Write(pktPubRec)
 				if err != nil {
 					return err
@@ -66,6 +73,7 @@ func (c *Client) serve() error {
 				pubAck := (&pktPubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubAck[pubAck.ID] <- pubAck:
+				default:
 				}
 			}
 		case packetPubRec:
@@ -73,11 +81,15 @@ func (c *Client) serve() error {
 				pubRec := (&pktPubRec{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubRec[pubRec.ID] <- pubRec:
+				default:
 				}
 			}
 		case packetPubRel:
 			pubRel := (&PubRel{}).parse(pktFlag, contents)
-			pktPubComp := pack(packetPubComp|packetFromClient, packUint16(pubRel.ID))
+			pktPubComp := pack(
+				packetPubComp.b()|packetFromClient.b(),
+				packUint16(pubRel.ID),
+			)
 			_, err := c.Transport.Write(pktPubComp)
 			if err != nil {
 				return err
@@ -87,6 +99,7 @@ func (c *Client) serve() error {
 				pubComp := (&pktPubComp{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubComp[pubComp.ID] <- pubComp:
+				default:
 				}
 			}
 		case packetSubAck:
@@ -94,6 +107,7 @@ func (c *Client) serve() error {
 				subAck := (&pktSubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chSubAck[subAck.ID] <- subAck:
+				default:
 				}
 			}
 		case packetUnsubAck:
@@ -101,12 +115,14 @@ func (c *Client) serve() error {
 				unsubAck := (&pktUnsubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chUnsubAck[unsubAck.ID] <- unsubAck:
+				default:
 				}
 			}
 		case packetPingResp:
 			pingResp := (&pktPingResp{}).parse(pktFlag, contents)
 			select {
 			case sig.chPingResp <- pingResp:
+			default:
 			}
 		}
 	}

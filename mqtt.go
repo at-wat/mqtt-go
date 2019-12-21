@@ -11,9 +11,9 @@ type QoS uint8
 
 const (
 	QoS0             QoS = 0x00
-	QoS1                 = 0x01
-	QoS2                 = 0x02
-	SubscribeFailure     = 0x80
+	QoS1             QoS = 0x01
+	QoS2             QoS = 0x02
+	SubscribeFailure QoS = 0x80
 )
 
 type Message struct {

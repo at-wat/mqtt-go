@@ -5,6 +5,6 @@ type pktPubRec struct {
 }
 
 func (p *pktPubRec) parse(flag byte, contents []byte) *pktPubRec {
-	p.ID = (uint16(contents[0]) << 8) | uint16(contents[1])
+	_, p.ID = unpackUint16(contents)
 	return p
 }

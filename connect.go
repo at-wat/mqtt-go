@@ -15,16 +15,14 @@ type connectFlag byte
 
 const (
 	connectFlagCleanSession connectFlag = 0x02
-	connectFlagWill                     = 0x04
-	connectFlagWillQoS0                 = 0x00
-	connectFlagWillQoS1                 = 0x08
-	connectFlagWillQoS2                 = 0x10
-	connectFlagWillRetain               = 0x20
-	connectFlagPassword                 = 0x40
-	connectFlagUserName                 = 0x80
+	connectFlagWill         connectFlag = 0x04
+	connectFlagWillQoS0     connectFlag = 0x00
+	connectFlagWillQoS1     connectFlag = 0x08
+	connectFlagWillQoS2     connectFlag = 0x10
+	connectFlagWillRetain   connectFlag = 0x20
+	connectFlagPassword     connectFlag = 0x40
+	connectFlagUserName     connectFlag = 0x80
 )
-
-const connectFlagWillQoSBit = 3
 
 func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
 	o := &ConnectOptions{
@@ -69,7 +67,7 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 		payload = append(payload, packString(o.Password)...)
 	}
 	pkt := pack(
-		byte(packetConnect),
+		packetConnect.b(),
 		[]byte{
 			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
 			byte(protocol311),
