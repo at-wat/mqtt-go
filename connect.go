@@ -57,23 +57,23 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 		if o.Will.Retain {
 			flag |= byte(connectFlagWillRetain)
 		}
-		payload = packString(o.Will.Topic)
-		payload = packBytes(o.Will.Payload)
+		payload = append(payload, packString(o.Will.Topic)...)
+		payload = append(payload, packBytes(o.Will.Payload)...)
 	}
 	if o.UserName != "" {
 		flag |= byte(connectFlagUserName)
-		payload = packString(o.UserName)
+		payload = append(payload, packString(o.UserName)...)
 	}
 	if o.Password != "" {
 		flag |= byte(connectFlagPassword)
-		payload = packString(o.Password)
+		payload = append(payload, packString(o.Password)...)
 	}
 	pkt := pack(
 		byte(packetConnect),
 		[]byte{
 			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
 			byte(protocol311),
-			byte(connectFlagCleanSession),
+			flag,
 		},
 		packUint16(o.KeepAlive),
 		payload,
