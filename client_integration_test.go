@@ -16,8 +16,7 @@ func TestIntegration_Connect(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -34,16 +33,14 @@ func TestIntegration_PublishQoS0(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Publish(ctx, &Message{
+	if err := cli.Publish(ctx, &Message{
 		Topic:   "test",
 		Payload: []byte("message"),
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -60,17 +57,15 @@ func TestIntegration_PublishQoS1(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Publish(ctx, &Message{
+	if err := cli.Publish(ctx, &Message{
 		Topic:   "test",
 		QoS:     QoS1,
 		Payload: []byte("message"),
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -87,27 +82,19 @@ func TestIntegration_PublishQoS2_SubscribeQoS1(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Subscribe(ctx, []*Message{
-		{
-			Topic: "test",
-			QoS:   QoS1,
-		},
-	})
-	if err != nil {
+	if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Publish(ctx, &Message{
+	if err := cli.Publish(ctx, &Message{
 		Topic:   "test",
 		QoS:     QoS2,
 		Payload: []byte("message"),
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -124,8 +111,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -134,22 +120,15 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 		chReceived <- msg
 	})
 
-	err = cli.Subscribe(ctx, []*Message{
-		{
-			Topic: "test",
-			QoS:   QoS2,
-		},
-	})
-	if err != nil {
+	if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Publish(ctx, &Message{
+	if err := cli.Publish(ctx, &Message{
 		Topic:   "test",
 		QoS:     QoS2,
 		Payload: []byte("message"),
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -176,25 +155,15 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Subscribe(ctx, []*Message{
-		{
-			Topic: "test",
-			QoS:   QoS2,
-		},
-	})
-	if err != nil {
+	if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Unsubscribe(ctx, []string{
-		"test",
-	})
-	if err != nil {
+	if err := cli.Unsubscribe(ctx, "test"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -211,13 +180,11 @@ func TestIntegration_Ping(t *testing.T) {
 	go cli.Serve()
 
 	ctx := context.Background()
-	err := cli.Connect(ctx, "Client1")
-	if err != nil {
+	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	err = cli.Ping(ctx)
-	if err != nil {
+	if err := cli.Ping(ctx); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 

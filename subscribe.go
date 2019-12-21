@@ -16,7 +16,7 @@ const (
 	subscribeFlagFailure = 0x80
 )
 
-func (c *Client) Subscribe(ctx context.Context, subs []*Message) error {
+func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	pktHeader := byte(packetSubscribe | packetFromClient)
 
 	id := newID()

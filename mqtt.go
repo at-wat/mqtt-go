@@ -27,7 +27,7 @@ type Message struct {
 
 type Subscription struct {
 	Topic string
-	QoS   uint8
+	QoS   QoS
 }
 
 type ConnectOptions struct {
@@ -44,7 +44,7 @@ type CommandClient interface {
 	Connect(ctx context.Context, clientID string, opts ...ConnectOption) error
 	Disconnect(ctx context.Context) error
 	Publish(ctx context.Context, message *Message) error
-	Subscribe(ctx context.Context, subs ...*Subscription) error
+	Subscribe(ctx context.Context, subs ...Subscription) error
 	Unsubscribe(ctx context.Context, subs ...string) error
 	Ping(ctx context.Context) error
 }
@@ -86,4 +86,32 @@ type signaller struct {
 	chPubComp  map[uint16]chan *PubComp
 	chSubAck   map[uint16]chan *SubAck
 	chUnsubAck map[uint16]chan *UnsubAck
+}
+
+func (s signaller) Copy() signaller {
+	var ret signaller
+	ret.chConnAck = s.chConnAck
+	ret.chPingResp = s.chPingResp
+	ret.chPubAck = make(map[uint16]chan *PubAck)
+	ret.chPubRec = make(map[uint16]chan *PubRec)
+	ret.chPubComp = make(map[uint16]chan *PubComp)
+	ret.chSubAck = make(map[uint16]chan *SubAck)
+	ret.chUnsubAck = make(map[uint16]chan *UnsubAck)
+
+	for k, v := range s.chPubAck {
+		ret.chPubAck[k] = v
+	}
+	for k, v := range s.chPubRec {
+		ret.chPubRec[k] = v
+	}
+	for k, v := range s.chPubComp {
+		ret.chPubComp[k] = v
+	}
+	for k, v := range s.chSubAck {
+		ret.chSubAck[k] = v
+	}
+	for k, v := range s.chUnsubAck {
+		ret.chUnsubAck[k] = v
+	}
+	return ret
 }

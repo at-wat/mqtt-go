@@ -33,7 +33,7 @@ func (c *Client) Serve() error {
 		fmt.Printf("%s: %v\n", pktType, contents)
 
 		c.mu.RLock()
-		sig := c.sig
+		sig := c.sig.Copy()
 		c.mu.RUnlock()
 
 		switch pktType {

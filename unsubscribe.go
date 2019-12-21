@@ -7,7 +7,7 @@ import (
 
 var ErrInvalidUnsubAck = errors.New("invalid SUBACK")
 
-func (c *Client) Unsubscribe(ctx context.Context, subs []string) error {
+func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 
 	id := newID()
