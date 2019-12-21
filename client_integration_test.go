@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"testing"
+	"time"
 )
 
 var (
@@ -26,7 +27,7 @@ func TestIntegration_Connect(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -46,7 +47,7 @@ func TestIntegration_Publish(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -80,9 +81,11 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			chReceived := make(chan *Message, 1)
+			chReceived := make(chan *Message, 10)
+			var cntSub int
 			cli.Handler = HandlerFunc(func(msg *Message) {
 				chReceived <- msg
+				cntSub++
 			})
 			cli.ConnState = func(s ConnState, err error) {
 				switch s {
@@ -93,7 +96,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 				}
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -127,6 +130,10 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 			if err := cli.Disconnect(ctx); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
+
+			if cntSub != 1 {
+				t.Errorf("Expected number of received message is 1, got %d", cntSub)
+			}
 		})
 	}
 }
@@ -139,7 +146,7 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -167,7 +174,7 @@ func TestIntegration_Ping(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -204,7 +211,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 				}
 			}
 
-			ctx := context.Background()
+			ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := cli.Connect(ctx, "Client1"); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
