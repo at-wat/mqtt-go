@@ -33,13 +33,13 @@ func (c ConnectionReturnCode) String() string {
 	return fmt.Sprintf("Unknown ConnectionReturnCode %x", int(c))
 }
 
-type ConnAck struct {
+type pktConnAck struct {
 	SessionPresent bool
 	Code           ConnectionReturnCode
 }
 
-func (p *ConnAck) parse(flag byte, contents []byte) *ConnAck {
-	return &ConnAck{
+func (p *pktConnAck) parse(flag byte, contents []byte) *pktConnAck {
+	return &pktConnAck{
 		SessionPresent: (contents[0]&0x01 != 0),
 		Code:           ConnectionReturnCode(contents[1]),
 	}

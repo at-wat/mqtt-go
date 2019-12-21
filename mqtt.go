@@ -83,24 +83,24 @@ type Client struct {
 }
 
 type signaller struct {
-	chConnAck  chan *ConnAck
-	chPingResp chan *PingResp
-	chPubAck   map[uint16]chan *PubAck
-	chPubRec   map[uint16]chan *PubRec
-	chPubComp  map[uint16]chan *PubComp
-	chSubAck   map[uint16]chan *SubAck
-	chUnsubAck map[uint16]chan *UnsubAck
+	chConnAck  chan *pktConnAck
+	chPingResp chan *pktPingResp
+	chPubAck   map[uint16]chan *pktPubAck
+	chPubRec   map[uint16]chan *pktPubRec
+	chPubComp  map[uint16]chan *pktPubComp
+	chSubAck   map[uint16]chan *pktSubAck
+	chUnsubAck map[uint16]chan *pktUnsubAck
 }
 
 func (s signaller) Copy() signaller {
 	var ret signaller
 	ret.chConnAck = s.chConnAck
 	ret.chPingResp = s.chPingResp
-	ret.chPubAck = make(map[uint16]chan *PubAck)
-	ret.chPubRec = make(map[uint16]chan *PubRec)
-	ret.chPubComp = make(map[uint16]chan *PubComp)
-	ret.chSubAck = make(map[uint16]chan *SubAck)
-	ret.chUnsubAck = make(map[uint16]chan *UnsubAck)
+	ret.chPubAck = make(map[uint16]chan *pktPubAck)
+	ret.chPubRec = make(map[uint16]chan *pktPubRec)
+	ret.chPubComp = make(map[uint16]chan *pktPubComp)
+	ret.chSubAck = make(map[uint16]chan *pktSubAck)
+	ret.chUnsubAck = make(map[uint16]chan *pktUnsubAck)
 
 	for k, v := range s.chPubAck {
 		ret.chPubAck[k] = v

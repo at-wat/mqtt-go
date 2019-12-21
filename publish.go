@@ -45,28 +45,28 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	}
 	pkt := pack(pktHeader, header, message.Payload)
 
-	var chPubAck chan *PubAck
-	var chPubRec chan *PubRec
-	var chPubComp chan *PubComp
+	var chPubAck chan *pktPubAck
+	var chPubRec chan *pktPubRec
+	var chPubComp chan *pktPubComp
 	switch message.QoS {
 	case QoS1:
-		chPubAck = make(chan *PubAck)
+		chPubAck = make(chan *pktPubAck)
 		c.mu.Lock()
 		if c.sig.chPubAck == nil {
-			c.sig.chPubAck = make(map[uint16]chan *PubAck)
+			c.sig.chPubAck = make(map[uint16]chan *pktPubAck)
 		}
 		c.sig.chPubAck[id] = chPubAck
 		c.mu.Unlock()
 	case QoS2:
-		chPubRec = make(chan *PubRec)
-		chPubComp = make(chan *PubComp)
+		chPubRec = make(chan *pktPubRec)
+		chPubComp = make(chan *pktPubComp)
 		c.mu.Lock()
 		if c.sig.chPubRec == nil {
-			c.sig.chPubRec = make(map[uint16]chan *PubRec)
+			c.sig.chPubRec = make(map[uint16]chan *pktPubRec)
 		}
 		c.sig.chPubRec[id] = chPubRec
 		if c.sig.chPubComp == nil {
-			c.sig.chPubComp = make(map[uint16]chan *PubComp)
+			c.sig.chPubComp = make(map[uint16]chan *pktPubComp)
 		}
 		c.sig.chPubComp[id] = chPubComp
 		c.mu.Unlock()

@@ -8,8 +8,8 @@ func (c *Client) Ping(ctx context.Context) error {
 	pktHeader := byte(packetPingReq)
 	pkt := pack(pktHeader)
 
-	var chPingResp chan *PingResp
-	chPingResp = make(chan *PingResp)
+	var chPingResp chan *pktPingResp
+	chPingResp = make(chan *pktPingResp)
 	c.mu.Lock()
 	c.sig.chPingResp = chPingResp
 	c.mu.Unlock()

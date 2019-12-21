@@ -40,7 +40,7 @@ func (c *Client) serve() error {
 		switch pktType {
 		case packetConnAck:
 			select {
-			case sig.chConnAck <- (&ConnAck{}).parse(pktFlag, contents):
+			case sig.chConnAck <- (&pktConnAck{}).parse(pktFlag, contents):
 			}
 		case packetPublish:
 			publish := (&Publish{}).parse(pktFlag, contents)
@@ -63,14 +63,14 @@ func (c *Client) serve() error {
 			}
 		case packetPubAck:
 			if sig.chPubAck != nil {
-				pubAck := (&PubAck{}).parse(pktFlag, contents)
+				pubAck := (&pktPubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubAck[pubAck.ID] <- pubAck:
 				}
 			}
 		case packetPubRec:
 			if sig.chPubRec != nil {
-				pubRec := (&PubRec{}).parse(pktFlag, contents)
+				pubRec := (&pktPubRec{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubRec[pubRec.ID] <- pubRec:
 				}
@@ -84,27 +84,27 @@ func (c *Client) serve() error {
 			}
 		case packetPubComp:
 			if sig.chPubComp != nil {
-				pubComp := (&PubComp{}).parse(pktFlag, contents)
+				pubComp := (&pktPubComp{}).parse(pktFlag, contents)
 				select {
 				case sig.chPubComp[pubComp.ID] <- pubComp:
 				}
 			}
 		case packetSubAck:
 			if sig.chSubAck != nil {
-				subAck := (&SubAck{}).parse(pktFlag, contents)
+				subAck := (&pktSubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chSubAck[subAck.ID] <- subAck:
 				}
 			}
 		case packetUnsubAck:
 			if sig.chUnsubAck != nil {
-				unsubAck := (&UnsubAck{}).parse(pktFlag, contents)
+				unsubAck := (&pktUnsubAck{}).parse(pktFlag, contents)
 				select {
 				case sig.chUnsubAck[unsubAck.ID] <- unsubAck:
 				}
 			}
 		case packetPingResp:
-			pingResp := (&PingResp{}).parse(pktFlag, contents)
+			pingResp := (&pktPingResp{}).parse(pktFlag, contents)
 			select {
 			case sig.chPingResp <- pingResp:
 			}

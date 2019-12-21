@@ -1,8 +1,8 @@
 package mqtt
 
-type PingResp struct {
+type pktPingResp struct {
 }
 
-func (p *PingResp) parse(flag byte, contents []byte) *PingResp {
+func (p *pktPingResp) parse(flag byte, contents []byte) *pktPingResp {
 	return p
 }

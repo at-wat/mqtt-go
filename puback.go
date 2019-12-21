@@ -1,10 +1,10 @@
 package mqtt
 
-type PubAck struct {
+type pktPubAck struct {
 	ID uint16
 }
 
-func (p *PubAck) parse(flag byte, contents []byte) *PubAck {
+func (p *pktPubAck) parse(flag byte, contents []byte) *pktPubAck {
 	p.ID = (uint16(contents[0]) << 8) | uint16(contents[1])
 	return p
 }
