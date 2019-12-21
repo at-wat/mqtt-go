@@ -46,6 +46,7 @@ type CommandClient interface {
 	Publish(ctx context.Context, message *Message) error
 	Subscribe(ctx context.Context, subs ...*Subscription) error
 	Unsubscribe(ctx context.Context, subs ...string) error
+	Ping(ctx context.Context) error
 }
 
 type HandlerFunc func(*Message)
@@ -79,6 +80,7 @@ type Client struct {
 
 type signaller struct {
 	chConnAck  chan *ConnAck
+	chPingResp chan *PingResp
 	chPubAck   map[uint16]chan *PubAck
 	chPubRec   map[uint16]chan *PubRec
 	chPubComp  map[uint16]chan *PubComp

@@ -99,6 +99,11 @@ func (c *Client) Serve() error {
 				case sig.chUnsubAck[unsubAck.ID] <- unsubAck:
 				}
 			}
+		case packetPingResp:
+			pingResp := (&PingResp{}).parse(pktFlag, contents)
+			select {
+			case sig.chPingResp <- pingResp:
+			}
 		}
 	}
 }

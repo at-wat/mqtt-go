@@ -16,18 +16,18 @@ const (
 	subscribeFlagFailure = 0x80
 )
 
-func (c *Client) Subscribe(ctx context.Context, messages []*Message) error {
+func (c *Client) Subscribe(ctx context.Context, subs []*Message) error {
 	pktHeader := byte(packetSubscribe | packetFromClient)
 
 	id := newID()
 	header := packUint16(id)
 
 	var payload []byte
-	for _, message := range messages {
-		payload = append(payload, packString(message.Topic)...)
+	for _, sub := range subs {
+		payload = append(payload, packString(sub.Topic)...)
 
 		var flag byte
-		switch message.QoS {
+		switch sub.QoS {
 		case QoS0:
 			flag |= byte(subscribeFlagQoS0)
 		case QoS1:
@@ -58,11 +58,11 @@ func (c *Client) Subscribe(ctx context.Context, messages []*Message) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case subAck := <-chSubAck:
-		if len(subAck.Codes) != len(messages) {
+		if len(subAck.Codes) != len(subs) {
 			return ErrInvalidSubAck
 		}
 		for i := 0; i < len(subAck.Codes); i++ {
-			messages[i].QoS = QoS(subAck.Codes[i])
+			subs[i].QoS = QoS(subAck.Codes[i])
 		}
 	}
 	return nil

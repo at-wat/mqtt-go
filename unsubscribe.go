@@ -7,15 +7,15 @@ import (
 
 var ErrInvalidUnsubAck = errors.New("invalid SUBACK")
 
-func (c *Client) Unsubscribe(ctx context.Context, topics []string) error {
+func (c *Client) Unsubscribe(ctx context.Context, subs []string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 
 	id := newID()
 	header := packUint16(id)
 
 	var payload []byte
-	for _, topic := range topics {
-		payload = append(payload, packString(topic)...)
+	for _, sub := range subs {
+		payload = append(payload, packString(sub)...)
 	}
 	pkt := pack(pktHeader, header, payload)
 
