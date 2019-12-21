@@ -87,33 +87,7 @@ func (d *DialOptions) dial(urlStr string) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		var p net.Conn
-		p, c.Transport = net.Pipe()
-		go func() {
-			for {
-				var b []byte
-				if err := websocket.Message.Receive(ws, &b); err != nil {
-					p.Close()
-					return
-				}
-				if _, err := p.Write(b); err != nil {
-					return
-				}
-			}
-		}()
-		go func() {
-			b := make([]byte, 1024)
-			for {
-				n, err := p.Read(b)
-				if err != nil {
-					return
-				}
-				if err := websocket.Message.Send(ws, b[:n]); err != nil {
-					p.Close()
-					return
-				}
-			}
-		}()
+		c.Transport = ws
 	default:
 		return nil, ErrUnsupportedProtocol
 	}
