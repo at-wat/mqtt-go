@@ -65,6 +65,7 @@ const (
 	StateNew ConnState = iota
 	StateActive
 	StateClosed
+	StateDisconnected
 )
 
 type Client struct {

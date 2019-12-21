@@ -118,6 +118,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 		case StateActive:
 		case StateClosed:
 			close(chReceived)
+		case StateDisconnected:
 		}
 	}
 	go cli.Serve()

@@ -14,5 +14,6 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.connStateUpdate(StateDisconnected)
 	return nil
 }

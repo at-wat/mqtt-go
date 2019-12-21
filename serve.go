@@ -7,11 +7,15 @@ import (
 
 func (c *Client) connStateUpdate(newState ConnState) {
 	c.mu.Lock()
-	c.connState = newState
+	lastState := c.connState
+	if c.connState != StateDisconnected {
+		c.connState = newState
+	}
+	state := c.connState
 	c.mu.Unlock()
 
-	if c.ConnState != nil {
-		c.ConnState(newState)
+	if c.ConnState != nil && lastState != state {
+		c.ConnState(state)
 	}
 }
 
