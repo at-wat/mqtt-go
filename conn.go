@@ -26,5 +26,28 @@ func (c *Client) Dial(urlStr string) error {
 	}
 	c.connStateUpdate(StateActive)
 	c.connClosed = make(chan struct{})
+
+	go func() {
+		err := c.serve()
+		c.mu.Lock()
+		c.err = err
+		c.mu.Unlock()
+	}()
+
 	return nil
+}
+
+func (c *Client) connStateUpdate(newState ConnState) {
+	c.mu.Lock()
+	lastState := c.connState
+	if c.connState != StateDisconnected {
+		c.connState = newState
+	}
+	state := c.connState
+	err := c.err
+	c.mu.Unlock()
+
+	if c.ConnState != nil && lastState != state {
+		c.ConnState(state, err)
+	}
 }

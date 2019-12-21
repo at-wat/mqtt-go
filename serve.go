@@ -4,25 +4,10 @@ import (
 	"io"
 )
 
-func (c *Client) connStateUpdate(newState ConnState) {
-	c.mu.Lock()
-	lastState := c.connState
-	if c.connState != StateDisconnected {
-		c.connState = newState
-	}
-	state := c.connState
-	c.mu.Unlock()
-
-	if c.ConnState != nil && lastState != state {
-		c.ConnState(state)
-	}
-}
-
-func (c *Client) Serve() error {
+func (c *Client) serve() error {
 	defer func() {
 		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
-
 	}()
 	for {
 		pktTypeBytes := make([]byte, 1)

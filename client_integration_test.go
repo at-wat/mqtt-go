@@ -13,7 +13,6 @@ func TestIntegration_Connect(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -30,7 +29,6 @@ func TestIntegration_PublishQoS0(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -54,7 +52,6 @@ func TestIntegration_PublishQoS1(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -79,7 +76,6 @@ func TestIntegration_PublishQoS2_SubscribeQoS1(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -113,7 +109,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 	cli.Handler = HandlerFunc(func(msg *Message) {
 		chReceived <- msg
 	})
-	cli.ConnState = func(s ConnState) {
+	cli.ConnState = func(s ConnState, err error) {
 		switch s {
 		case StateActive:
 		case StateClosed:
@@ -121,7 +117,6 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 		case StateDisconnected:
 		}
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -164,7 +159,6 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
@@ -189,7 +183,6 @@ func TestIntegration_Ping(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {

@@ -73,11 +73,12 @@ type Client struct {
 	Handler     Handler
 	SendTimeout time.Duration
 	RecvTimeout time.Duration
-	ConnState   func(ConnState)
+	ConnState   func(ConnState, error)
 
 	sig        signaller
 	mu         sync.RWMutex
 	connState  ConnState
+	err        error
 	connClosed chan struct{}
 }
 
