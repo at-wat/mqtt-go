@@ -42,7 +42,7 @@ func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	}
 	pkt := pack(pktHeader, header, payload)
 
-	chSubAck := make(chan *pktSubAck)
+	chSubAck := make(chan *pktSubAck, 1)
 	c.mu.Lock()
 	if c.sig.chSubAck == nil {
 		c.sig.chSubAck = make(map[uint16]chan *pktSubAck)

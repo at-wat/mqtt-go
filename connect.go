@@ -78,7 +78,7 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 		payload,
 	)
 
-	chConnAck := make(chan *pktConnAck)
+	chConnAck := make(chan *pktConnAck, 1)
 	c.mu.Lock()
 	c.sig.chConnAck = chConnAck
 	c.mu.Unlock()

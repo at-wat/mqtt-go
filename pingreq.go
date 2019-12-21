@@ -8,7 +8,7 @@ import (
 func (c *Client) Ping(ctx context.Context) error {
 	pkt := pack(packetPingReq.b())
 
-	chPingResp := make(chan *pktPingResp)
+	chPingResp := make(chan *pktPingResp, 1)
 	c.mu.Lock()
 	c.sig.chPingResp = chPingResp
 	c.mu.Unlock()

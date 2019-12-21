@@ -17,7 +17,7 @@ func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 	}
 	pkt := pack(pktHeader, header, payload)
 
-	chUnsubAck := make(chan *pktUnsubAck)
+	chUnsubAck := make(chan *pktUnsubAck, 1)
 	c.mu.Lock()
 	if c.sig.chUnsubAck == nil {
 		c.sig.chUnsubAck = make(map[uint16]chan *pktUnsubAck)

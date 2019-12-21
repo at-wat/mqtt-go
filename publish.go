@@ -51,7 +51,7 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	var chPubComp chan *pktPubComp
 	switch message.QoS {
 	case QoS1:
-		chPubAck = make(chan *pktPubAck)
+		chPubAck = make(chan *pktPubAck, 1)
 		c.mu.Lock()
 		if c.sig.chPubAck == nil {
 			c.sig.chPubAck = make(map[uint16]chan *pktPubAck)
@@ -59,8 +59,8 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 		c.sig.chPubAck[id] = chPubAck
 		c.mu.Unlock()
 	case QoS2:
-		chPubRec = make(chan *pktPubRec)
-		chPubComp = make(chan *pktPubComp)
+		chPubRec = make(chan *pktPubRec, 1)
+		chPubComp = make(chan *pktPubComp, 1)
 		c.mu.Lock()
 		if c.sig.chPubRec == nil {
 			c.sig.chPubRec = make(map[uint16]chan *pktPubRec)
