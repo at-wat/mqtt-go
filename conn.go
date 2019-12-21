@@ -9,9 +9,13 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// ErrUnsupportedProtocol means that the specified scheme in the URL is not supported.
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
+
+// ErrClosedTransport means that the underlying connection is closed.
 var ErrClosedTransport = errors.New("read/write on closed transport")
 
+// Dial creates MQTT client using URL string.
 func Dial(urlStr string) (*Client, error) {
 	c := &Client{}
 	u, err := url.Parse(urlStr)
