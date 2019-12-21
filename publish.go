@@ -73,8 +73,7 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 		c.mu.Unlock()
 	}
 
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	switch message.QoS {
@@ -95,8 +94,7 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 		case <-chPubRec:
 		}
 		pktPubRel := pack(packetPubRel.b()|packetFromClient.b(), packUint16(id))
-		_, err := c.Transport.Write(pktPubRel)
-		if err != nil {
+		if err := c.write(pktPubRel); err != nil {
 			return err
 		}
 		select {

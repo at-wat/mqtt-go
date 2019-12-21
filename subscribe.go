@@ -50,8 +50,7 @@ func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 	c.sig.chSubAck[id] = chSubAck
 	c.mu.Unlock()
 
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	select {

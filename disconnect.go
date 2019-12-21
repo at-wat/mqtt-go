@@ -11,8 +11,7 @@ func (c *Client) Disconnect(ctx context.Context) error {
 		[]byte{},
 		[]byte{},
 	)
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	c.connStateUpdate(StateDisconnected)

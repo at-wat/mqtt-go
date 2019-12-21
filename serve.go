@@ -54,8 +54,7 @@ func (c *Client) serve() error {
 					packetPubAck.b()|packetFromClient.b(),
 					packUint16(publish.Message.ID),
 				)
-				_, err := c.Transport.Write(pktPubAck)
-				if err != nil {
+				if err := c.write(pktPubAck); err != nil {
 					return err
 				}
 			case QoS2:
@@ -63,8 +62,7 @@ func (c *Client) serve() error {
 					packetPubRec.b()|packetFromClient.b(),
 					packUint16(publish.Message.ID),
 				)
-				_, err := c.Transport.Write(pktPubRec)
-				if err != nil {
+				if err := c.write(pktPubRec); err != nil {
 					return err
 				}
 			}
@@ -90,8 +88,7 @@ func (c *Client) serve() error {
 				packetPubComp.b()|packetFromClient.b(),
 				packUint16(pubRel.ID),
 			)
-			_, err := c.Transport.Write(pktPubComp)
-			if err != nil {
+			if err := c.write(pktPubComp); err != nil {
 				return err
 			}
 		case packetPubComp:

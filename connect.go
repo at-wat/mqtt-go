@@ -82,8 +82,7 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 	c.mu.Lock()
 	c.sig.chConnAck = chConnAck
 	c.mu.Unlock()
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	select {

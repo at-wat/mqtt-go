@@ -19,6 +19,21 @@ type Client struct {
 	connState  ConnState
 	err        error
 	connClosed chan struct{}
+	muWrite    sync.Mutex
+}
+
+func (c *Client) write(b []byte) error {
+	l := len(b)
+	c.muWrite.Lock()
+	defer c.muWrite.Unlock()
+	for i := 0; i < l; {
+		n, err := c.Transport.Write(b[i : l-i])
+		if err != nil {
+			return err
+		}
+		i += n
+	}
+	return nil
 }
 
 type signaller struct {

@@ -25,8 +25,7 @@ func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 	c.sig.chUnsubAck[id] = chUnsubAck
 	c.mu.Unlock()
 
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	select {

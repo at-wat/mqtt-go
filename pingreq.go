@@ -13,8 +13,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	c.sig.chPingResp = chPingResp
 	c.mu.Unlock()
 
-	_, err := c.Transport.Write(pkt)
-	if err != nil {
+	if err := c.write(pkt); err != nil {
 		return err
 	}
 	select {
