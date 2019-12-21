@@ -33,6 +33,8 @@ func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
 		return err
 	}
 	select {
+	case <-c.connClosed:
+		return ErrClosedTransport
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-chUnsubAck:

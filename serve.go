@@ -5,8 +5,21 @@ import (
 	"io"
 )
 
+func (c *Client) connStateUpdate(newState ConnState) {
+	c.mu.Lock()
+	c.connState = newState
+	c.mu.Unlock()
+
+	if c.ConnState != nil {
+		c.ConnState(newState)
+	}
+}
+
 func (c *Client) Serve() error {
 	defer func() {
+		c.connStateUpdate(StateClosed)
+		close(c.connClosed)
+
 	}()
 	for {
 		pktTypeBytes := make([]byte, 1)

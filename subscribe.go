@@ -55,6 +55,8 @@ func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
 		return err
 	}
 	select {
+	case <-c.connClosed:
+		return ErrClosedTransport
 	case <-ctx.Done():
 		return ctx.Err()
 	case subAck := <-chSubAck:

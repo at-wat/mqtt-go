@@ -19,6 +19,8 @@ func (c *Client) Ping(ctx context.Context) error {
 		return err
 	}
 	select {
+	case <-c.connClosed:
+		return ErrClosedTransport
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-chPingResp:

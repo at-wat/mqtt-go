@@ -74,8 +74,10 @@ type Client struct {
 	RecvTimeout time.Duration
 	ConnState   func(ConnState)
 
-	sig signaller
-	mu  sync.RWMutex
+	sig        signaller
+	mu         sync.RWMutex
+	connState  ConnState
+	connClosed chan struct{}
 }
 
 type signaller struct {

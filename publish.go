@@ -79,12 +79,16 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 	switch message.QoS {
 	case QoS1:
 		select {
+		case <-c.connClosed:
+			return ErrClosedTransport
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-chPubAck:
 		}
 	case QoS2:
 		select {
+		case <-c.connClosed:
+			return ErrClosedTransport
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-chPubRec:
@@ -95,6 +99,8 @@ func (c *Client) Publish(ctx context.Context, message *Message) error {
 			return err
 		}
 		select {
+		case <-c.connClosed:
+			return ErrClosedTransport
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-chPubComp:

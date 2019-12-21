@@ -108,17 +108,24 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 	if err := cli.Dial("mqtt://localhost:1883"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
+
+	chReceived := make(chan *Message, 1)
+	cli.Handler = HandlerFunc(func(msg *Message) {
+		chReceived <- msg
+	})
+	cli.ConnState = func(s ConnState) {
+		switch s {
+		case StateActive:
+		case StateClosed:
+			close(chReceived)
+		}
+	}
 	go cli.Serve()
 
 	ctx := context.Background()
 	if err := cli.Connect(ctx, "Client1"); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-
-	chReceived := make(chan *Message, 100)
-	cli.Handler = HandlerFunc(func(msg *Message) {
-		chReceived <- msg
-	})
 
 	if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
@@ -133,7 +140,11 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 	}
 
 	select {
-	case msg := <-chReceived:
+	case msg, ok := <-chReceived:
+		if !ok {
+			t.Errorf("Connection closed unexpectedly")
+			break
+		}
 		if msg.Topic != "test" {
 			t.Errorf("Expected topic name of 'test', got '%s'", msg.Topic)
 		}

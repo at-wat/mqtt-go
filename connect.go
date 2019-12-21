@@ -88,6 +88,8 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 		return err
 	}
 	select {
+	case <-c.connClosed:
+		return ErrClosedTransport
 	case <-ctx.Done():
 		return ctx.Err()
 	case connAck := <-chConnAck:

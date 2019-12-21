@@ -7,6 +7,7 @@ import (
 )
 
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
+var ErrClosedTransport = errors.New("read/write on closed transport")
 
 func (c *Client) Dial(urlStr string) error {
 	u, err := url.Parse(urlStr)
@@ -23,5 +24,7 @@ func (c *Client) Dial(urlStr string) error {
 	default:
 		return ErrUnsupportedProtocol
 	}
+	c.connStateUpdate(StateActive)
+	c.connClosed = make(chan struct{})
 	return nil
 }
