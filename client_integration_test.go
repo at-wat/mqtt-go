@@ -82,16 +82,15 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 			}
 
 			chReceived := make(chan *Message, 100)
-			var cntSub int
 			cli.Handler = HandlerFunc(func(msg *Message) {
 				chReceived <- msg
-				cntSub++
 			})
 			cli.ConnState = func(s ConnState, err error) {
 				switch s {
 				case StateActive:
 				case StateClosed:
 					close(chReceived)
+					t.Errorf("Connection is expected to be disconnected, but closed.")
 				case StateDisconnected:
 				}
 			}
@@ -129,10 +128,6 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 
 			if err := cli.Disconnect(ctx); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
-			}
-
-			if cntSub != 1 {
-				t.Errorf("Expected number of received message is 1, got %d", cntSub)
 			}
 		})
 	}
