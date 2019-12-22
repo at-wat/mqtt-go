@@ -22,7 +22,7 @@ before_script:
 
 script:
   - go vet ./...
-  - go test . -tags integration
+  - go test $(go list ./... | grep -v examples) -tags integration -race -coverprofile=coverage.txt -covermode=atomic
 
 after_script:
   - docker-compose down
