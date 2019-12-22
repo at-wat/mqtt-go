@@ -27,9 +27,7 @@ const (
 
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
-	o := &ConnectOptions{
-		KeepAlive: 60,
-	}
+	o := &ConnectOptions{}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
 			return false, err
@@ -42,7 +40,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	go func() {
 		err := c.serve()
 		if err != io.EOF && err != io.ErrUnexpectedEOF {
-			if errConn := c.Transport.Close(); errConn != nil && err == nil {
+			if errConn := c.Close(); errConn != nil && err == nil {
 				err = errConn
 			}
 		}
