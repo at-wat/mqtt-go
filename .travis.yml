@@ -21,8 +21,11 @@ before_script:
   - docker-compose up -d
 
 script:
-  - go vet ./...
-  - go test $(go list ./... | grep -v examples) -tags integration -race -coverprofile=coverage.txt -covermode=atomic
+  - go vet -tags integration ./...
+  - |
+    go test $(go list ./... | grep -v examples) \
+      -tags integration \
+      -race -coverprofile=coverage.txt -covermode=atomic
 
 after_script:
   - docker-compose down
