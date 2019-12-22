@@ -2,7 +2,8 @@ coverage:
   status:
     project:
       default:
-        threshold: 5
+        threshold: 5%
+        if_not_found: success
     patch:
       default:
         against: parent
