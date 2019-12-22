@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -18,6 +19,39 @@ var (
 		"WebSockets": "wss://localhost:9443",
 	}
 )
+
+func ExampleClient() {
+	baseCli, err := Dial("mqtt://localhost:1883")
+	if err != nil {
+		panic(err)
+	}
+	baseCli.Handler = HandlerFunc(func(msg *Message) {
+		fmt.Printf("%s[%d]: %s", msg.Topic, int(msg.QoS), []byte(msg.Payload))
+	})
+
+	// store as Client to make it easy to enable high level wrapper later
+	var cli Client = baseCli
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+
+	if err := cli.Connect(ctx, "TestClient"); err != nil {
+		panic(err)
+	}
+	if err := cli.Subscribe(ctx, Subscription{Topic: "test/topic", QoS: QoS1}); err != nil {
+		panic(err)
+	}
+
+	if err := cli.Publish(ctx, &Message{
+		Topic: "test/topic", QoS: QoS1, Payload: []byte("message"),
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		panic(err)
+	}
+
+	// Output: test/topic[1]: message
+}
 
 func TestIntegration_Connect(t *testing.T) {
 	for name, url := range urls {
