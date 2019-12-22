@@ -27,9 +27,7 @@ const (
 
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
-	o := &ConnectOptions{
-		KeepAlive: 60,
-	}
+	o := &ConnectOptions{}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
 			return false, err
@@ -37,7 +35,6 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}
 	c.sig = &signaller{}
 	c.connClosed = make(chan struct{})
-	c.connectOpts = o
 	c.initID()
 
 	go func() {

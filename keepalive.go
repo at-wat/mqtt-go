@@ -13,12 +13,10 @@ var ErrKeepAliveDisabled = errors.New("keep alive disabled")
 var ErrPingTimeout = errors.New("ping timeout")
 
 // KeepAlive runs keep alive loop.
-// It must be called after Connect.
-func KeepAlive(ctx context.Context, cli *BaseClient, timeout time.Duration) error {
-	if cli.connectOpts.KeepAlive == 0 {
-		return ErrKeepAliveDisabled
-	}
-	ticker := time.NewTicker(time.Duration(cli.connectOpts.KeepAlive) * time.Second)
+// It must be called after Connect and interval must be smaller than the value
+// specified by WithKeepAlive option passed to Connect.
+func KeepAlive(ctx context.Context, cli ClientCloser, interval, timeout time.Duration) error {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

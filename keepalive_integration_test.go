@@ -27,7 +27,11 @@ func TestIntegration_KeepAlive(t *testing.T) {
 			}
 
 			// Without keepalive, broker should disconnect on t=1.5s.
-			if err := KeepAlive(ctx, cli, time.Second); err != context.DeadlineExceeded {
+			if err := KeepAlive(
+				ctx, cli,
+				time.Second,
+				500*time.Millisecond,
+			); err != context.DeadlineExceeded {
 				t.Errorf("Expected error: '%v', got: '%v'", context.DeadlineExceeded, err)
 
 				if err := cli.Disconnect(ctx); err != nil {

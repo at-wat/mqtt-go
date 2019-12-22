@@ -53,6 +53,17 @@ type Client interface {
 	Ping(ctx context.Context) error
 }
 
+// Closer is the interface of connection closer.
+type Closer interface {
+	Close() error
+}
+
+// ClientCloser groups Client and Closer interface
+type ClientCloser interface {
+	Client
+	Closer
+}
+
 // HandlerFunc type is an adapter to use functions as MQTT message handler.
 type HandlerFunc func(*Message)
 

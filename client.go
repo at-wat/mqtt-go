@@ -15,14 +15,13 @@ type BaseClient struct {
 	// ConnState is called if the connection state is changed.
 	ConnState func(ConnState, error)
 
-	sig         *signaller
-	mu          sync.RWMutex
-	connState   ConnState
-	err         error
-	connClosed  chan struct{}
-	muWrite     sync.Mutex
-	connectOpts *ConnectOptions
-	idLast      uint32
+	sig        *signaller
+	mu         sync.RWMutex
+	connState  ConnState
+	err        error
+	connClosed chan struct{}
+	muWrite    sync.Mutex
+	idLast     uint32
 }
 
 // WithUserNamePassword sets plain text auth information used in Connect.
