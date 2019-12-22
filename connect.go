@@ -37,6 +37,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}
 	c.sig = &signaller{}
 	c.connClosed = make(chan struct{})
+	c.initID()
 
 	go func() {
 		err := c.serve()

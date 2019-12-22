@@ -18,7 +18,7 @@ func TestConnect(t *testing.T) {
 		defer cancel()
 		_, _ = cli.Connect(ctx, "cli",
 			WithUserNamePassword("user", "pass"),
-			WithKeepalive(0x0123),
+			WithKeepAlive(0x0123),
 			WithCleanSession(true),
 			WithWill(&Message{QoS: QoS1, Topic: "topic", Payload: []byte{0x01}}),
 		)

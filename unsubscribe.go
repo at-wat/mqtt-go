@@ -8,7 +8,7 @@ import (
 func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 
-	id := newID()
+	id := c.newID()
 	header := packUint16(id)
 
 	var payload []byte
