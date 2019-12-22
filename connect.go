@@ -26,13 +26,13 @@ const (
 )
 
 // Connect to the broker.
-func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
+func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
 	o := &ConnectOptions{
 		KeepAlive: 60,
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
-			return err
+			return false, err
 		}
 	}
 	c.sig = &signaller{}
@@ -99,18 +99,18 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	c.sig.chConnAck = chConnAck
 	c.mu.Unlock()
 	if err := c.write(pkt); err != nil {
-		return err
+		return false, err
 	}
 	select {
 	case <-c.connClosed:
-		return ErrClosedTransport
+		return false, ErrClosedTransport
 	case <-ctx.Done():
-		return ctx.Err()
+		return false, ctx.Err()
 	case connAck := <-chConnAck:
 		if connAck.Code != ConnectionAccepted {
-			return errors.New(connAck.Code.String())
+			return false, errors.New(connAck.Code.String())
 		}
 		c.connStateUpdate(StateActive)
+		return connAck.SessionPresent, nil
 	}
-	return nil
 }
