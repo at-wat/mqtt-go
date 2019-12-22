@@ -3,16 +3,17 @@ package mqtt
 import (
 	"io"
 	"sync"
-	"time"
 )
 
-// BaseClient is an MQTT client.
+// BaseClient is a low layer MQTT client.
+// Zero values with valid underlying Transport is a valid BaseClient.
 type BaseClient struct {
-	Transport   io.ReadWriteCloser
-	Handler     Handler
-	SendTimeout time.Duration
-	RecvTimeout time.Duration
-	ConnState   func(ConnState, error)
+	// Transport is an underlying connection. Typically net.Conn.
+	Transport io.ReadWriteCloser
+	// Handler of incoming messages.
+	Handler Handler
+	// ConnState is called if the connection state is changed.
+	ConnState func(ConnState, error)
 
 	sig        *signaller
 	mu         sync.RWMutex
