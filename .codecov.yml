@@ -5,7 +5,4 @@ coverage:
         target: auto
         base: auto
         threshold: 5%
-    patch:
-      default:
-        target: 25%
-        base: pr
+    patch: off
