@@ -3,7 +3,6 @@ package mqtt
 import (
 	"io"
 	"sync"
-	"time"
 )
 
 // BaseClient is a low layer MQTT client.
