@@ -46,3 +46,51 @@ func TestConnect(t *testing.T) {
 	}
 	cli.Close()
 }
+
+func TestProtocolViolation(t *testing.T) {
+	ca, cb := net.Pipe()
+	cli := &BaseClient{Transport: cb}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		if err := cli.Connect(ctx, "cli"); err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	}()
+
+	errCh := make(chan error, 10)
+	cli.ConnState = func(s ConnState, err error) {
+		if s == StateClosed {
+			errCh <- err
+		}
+	}
+
+	b := make([]byte, 100)
+	if _, err := ca.Read(b); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Send CONNACK.
+	if _, err := ca.Write([]byte{
+		0x20, 0x02, 0x00, 0x00,
+	}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Send SUBSCRIBE from broker.
+	if _, err := ca.Write([]byte{
+		0x80, 0x01, 0x00,
+	}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != ErrInvalidPacket {
+			t.Errorf("Expected error against invalid packet: %v, got: %v", ErrInvalidPacket, err)
+		}
+	case <-ctx.Done():
+		t.Error("Timeout")
+	}
+}
