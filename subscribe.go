@@ -17,7 +17,7 @@ const (
 )
 
 // Subscribe topics.
-func (c *Client) Subscribe(ctx context.Context, subs ...Subscription) error {
+func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error {
 	pktHeader := byte(packetSubscribe | packetFromClient)
 
 	id := newID()

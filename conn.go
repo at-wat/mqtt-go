@@ -17,7 +17,7 @@ var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 var ErrClosedTransport = errors.New("read/write on closed transport")
 
 // Dial creates MQTT client using URL string.
-func Dial(urlStr string, opts ...DialOption) (*Client, error) {
+func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
 	o := &DialOptions{
 		Dialer: &net.Dialer{},
 	}
@@ -54,8 +54,8 @@ func WithTLSConfig(config *tls.Config) DialOption {
 	}
 }
 
-func (d *DialOptions) dial(urlStr string) (*Client, error) {
-	c := &Client{}
+func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
+	c := &BaseClient{}
 
 	u, err := url.Parse(urlStr)
 	if err != nil {
@@ -103,7 +103,7 @@ func (d *DialOptions) dial(urlStr string) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) connStateUpdate(newState ConnState) {
+func (c *BaseClient) connStateUpdate(newState ConnState) {
 	c.mu.Lock()
 	lastState := c.connState
 	if c.connState != StateDisconnected {
@@ -119,6 +119,6 @@ func (c *Client) connStateUpdate(newState ConnState) {
 }
 
 // Close force closes MQTT connection.
-func (c *Client) Close() error {
+func (c *BaseClient) Close() error {
 	return c.Transport.Close()
 }

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Client is an MQTT client.
-type Client struct {
+// BaseClient is an MQTT client.
+type BaseClient struct {
 	Transport   io.ReadWriteCloser
 	Handler     Handler
 	SendTimeout time.Duration
@@ -22,7 +22,7 @@ type Client struct {
 	muWrite    sync.Mutex
 }
 
-func (c *Client) write(b []byte) error {
+func (c *BaseClient) write(b []byte) error {
 	l := len(b)
 	c.muWrite.Lock()
 	defer c.muWrite.Unlock()

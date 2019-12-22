@@ -5,7 +5,7 @@ import (
 )
 
 // Unsubscribe topics.
-func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
+func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	pktHeader := byte(packetUnsubscribe | packetFromClient)
 
 	id := newID()

@@ -16,7 +16,7 @@ const (
 )
 
 // Publish a message to the broker.
-func (c *Client) Publish(ctx context.Context, message *Message) error {
+func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	pktHeader := packetPublish.b()
 	header := packString(message.Topic)
 
