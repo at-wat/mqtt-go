@@ -5,7 +5,7 @@ import (
 )
 
 // Ping to the broker.
-func (c *Client) Ping(ctx context.Context) error {
+func (c *BaseClient) Ping(ctx context.Context) error {
 	pkt := pack(packetPingReq.b())
 
 	chPingResp := make(chan *pktPingResp, 1)

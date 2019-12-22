@@ -5,7 +5,7 @@ import (
 )
 
 // Disconnect from the broker.
-func (c *Client) Disconnect(ctx context.Context) error {
+func (c *BaseClient) Disconnect(ctx context.Context) error {
 	pkt := pack(
 		packetDisconnect.b(),
 		[]byte{},

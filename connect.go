@@ -25,7 +25,7 @@ const (
 )
 
 // Connect to the broker.
-func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
+func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) error {
 	o := &ConnectOptions{
 		KeepAlive: 60,
 	}

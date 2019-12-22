@@ -43,8 +43,8 @@ type ConnectOptions struct {
 // ConnectOption sets option for Connect.
 type ConnectOption func(*ConnectOptions) error
 
-// CommandClient is the interface of MQTT client.
-type CommandClient interface {
+// Client is the interface of MQTT client.
+type Client interface {
 	Connect(ctx context.Context, clientID string, opts ...ConnectOption) error
 	Disconnect(ctx context.Context) error
 	Publish(ctx context.Context, message *Message) error

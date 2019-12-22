@@ -4,7 +4,7 @@ import (
 	"io"
 )
 
-func (c *Client) serve() error {
+func (c *BaseClient) serve() error {
 	defer func() {
 		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
