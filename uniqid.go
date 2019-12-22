@@ -6,18 +6,18 @@ import (
 	"time"
 )
 
-var (
-	idLast     uint32
-	idInterval uint32
-)
-
 func init() {
 	rand.Seed(time.Now().UnixNano())
-
-	idLast = uint32(rand.Int31n(0xFFFF))
-	idInterval = uint32(rand.Int31n(15) + 1)
 }
 
-func newID() uint16 {
-	return uint16(atomic.AddUint32(&idLast, idInterval))
+func (c *BaseClient) initID() {
+	c.idLast = uint32(rand.Int31n(0xFFFE)) + 1
+}
+
+func (c *BaseClient) newID() uint16 {
+	id := uint16(atomic.AddUint32(&c.idLast, 1))
+	if id == 0 {
+		return c.newID()
+	}
+	return id
 }

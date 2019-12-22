@@ -21,6 +21,7 @@ type BaseClient struct {
 	err        error
 	connClosed chan struct{}
 	muWrite    sync.Mutex
+	idLast     uint32
 }
 
 // WithUserNamePassword sets plain text auth information used in Connect.
