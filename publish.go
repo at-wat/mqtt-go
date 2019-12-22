@@ -16,6 +16,7 @@ const (
 )
 
 // Publish a message to the broker.
+// ID field of the message is filled if zero.
 func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	pktHeader := packetPublish.b()
 	header := packString(message.Topic)
@@ -36,13 +37,12 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	if message.Dup {
 		pktHeader |= byte(publishFlagDup)
 	}
-	if message.ID != 0 {
-		panic("ID is set by user")
+	if message.ID == 0 {
+		message.ID = c.newID()
 	}
-	id := newID()
 
 	if message.QoS != QoS0 {
-		header = append(header, packUint16(id)...)
+		header = append(header, packUint16(message.ID)...)
 	}
 	pkt := pack(pktHeader, header, message.Payload)
 
@@ -56,7 +56,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		if c.sig.chPubAck == nil {
 			c.sig.chPubAck = make(map[uint16]chan *pktPubAck)
 		}
-		c.sig.chPubAck[id] = chPubAck
+		c.sig.chPubAck[message.ID] = chPubAck
 		c.sig.mu.Unlock()
 	case QoS2:
 		chPubRec = make(chan *pktPubRec, 1)
@@ -65,11 +65,11 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		if c.sig.chPubRec == nil {
 			c.sig.chPubRec = make(map[uint16]chan *pktPubRec)
 		}
-		c.sig.chPubRec[id] = chPubRec
+		c.sig.chPubRec[message.ID] = chPubRec
 		if c.sig.chPubComp == nil {
 			c.sig.chPubComp = make(map[uint16]chan *pktPubComp)
 		}
-		c.sig.chPubComp[id] = chPubComp
+		c.sig.chPubComp[message.ID] = chPubComp
 		c.sig.mu.Unlock()
 	}
 
@@ -93,7 +93,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 			return ctx.Err()
 		case <-chPubRec:
 		}
-		pktPubRel := pack(packetPubRel.b()|packetFromClient.b(), packUint16(id))
+		pktPubRel := pack(packetPubRel.b()|packetFromClient.b(), packUint16(message.ID))
 		if err := c.write(pktPubRel); err != nil {
 			return err
 		}
