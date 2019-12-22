@@ -3,9 +3,9 @@ coverage:
     project:
       default:
         target: auto
+        base: auto
         threshold: 5%
-        if_not_found: success
     patch:
       default:
-        against: parent
-        target: 50%
+        target: 25%
+        base: pr
