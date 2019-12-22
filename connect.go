@@ -37,12 +37,13 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}
 	c.sig = &signaller{}
 	c.connClosed = make(chan struct{})
+	c.connectOpts = o
 	c.initID()
 
 	go func() {
 		err := c.serve()
 		if err != io.EOF && err != io.ErrUnexpectedEOF {
-			if errConn := c.Transport.Close(); errConn != nil && err == nil {
+			if errConn := c.Close(); errConn != nil && err == nil {
 				err = errConn
 			}
 		}
