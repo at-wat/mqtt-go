@@ -72,7 +72,6 @@ type ConnState int
 // ConnState values.
 const (
 	StateNew          ConnState = iota // initial state
-	StateIdle                          // transport layer is opened
 	StateActive                        // connected to the broker
 	StateClosed                        // connection is unexpectedly closed
 	StateDisconnected                  // connection is expectedly closed

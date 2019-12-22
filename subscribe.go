@@ -60,6 +60,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 		return ctx.Err()
 	case subAck := <-chSubAck:
 		if len(subAck.Codes) != len(subs) {
+			c.Transport.Close()
 			return ErrInvalidSubAck
 		}
 		for i := 0; i < len(subAck.Codes); i++ {

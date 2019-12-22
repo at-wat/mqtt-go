@@ -3,6 +3,7 @@ package mqtt
 import (
 	"context"
 	"errors"
+	"io"
 )
 
 type protocolLevel byte
@@ -35,7 +36,20 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		}
 	}
 	c.sig = &signaller{}
+	c.connClosed = make(chan struct{})
 
+	go func() {
+		err := c.serve()
+		if err != io.EOF && err != io.ErrUnexpectedEOF {
+			if errConn := c.Transport.Close(); errConn != nil && err == nil {
+				err = errConn
+			}
+		}
+		c.mu.Lock()
+		c.err = err
+		c.mu.Unlock()
+		c.connStateUpdate(StateClosed)
+	}()
 	payload := packString(clientID)
 
 	var flag byte

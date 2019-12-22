@@ -1,12 +1,15 @@
 package mqtt
 
 import (
+	"errors"
 	"io"
 )
 
+// ErrInvalidPacket means that an invalid message is arrived from the broker.
+var ErrInvalidPacket = errors.New("invalid packet")
+
 func (c *BaseClient) serve() error {
 	defer func() {
-		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
 	}()
 	r := c.Transport
@@ -118,6 +121,9 @@ func (c *BaseClient) serve() error {
 			case c.sig.PingResp() <- pingResp:
 			default:
 			}
+		default:
+			// must close connection if the client encounted protocol violation.
+			return ErrInvalidPacket
 		}
 	}
 }
