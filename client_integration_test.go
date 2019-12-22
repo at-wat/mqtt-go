@@ -21,19 +21,22 @@ var (
 )
 
 func ExampleClient() {
+	done := make(chan struct{})
+
 	baseCli, err := Dial("mqtt://localhost:1883")
 	if err != nil {
 		panic(err)
 	}
 	baseCli.Handler = HandlerFunc(func(msg *Message) {
 		fmt.Printf("%s[%d]: %s", msg.Topic, int(msg.QoS), []byte(msg.Payload))
+		close(done)
 	})
 
 	// store as Client to make it easy to enable high level wrapper later
 	var cli Client = baseCli
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 
-	if err := cli.Connect(ctx, "TestClient"); err != nil {
+	if err := cli.Connect(ctx, "TestClient", WithCleanSession(true)); err != nil {
 		panic(err)
 	}
 	if err := cli.Subscribe(ctx, Subscription{Topic: "test/topic", QoS: QoS1}); err != nil {
@@ -46,6 +49,7 @@ func ExampleClient() {
 		panic(err)
 	}
 
+	<-done
 	if err := cli.Disconnect(ctx); err != nil {
 		panic(err)
 	}
