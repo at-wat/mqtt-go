@@ -15,7 +15,7 @@ func TestConnect(t *testing.T) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		_ = cli.Connect(ctx, "cli",
+		_, _ = cli.Connect(ctx, "cli",
 			WithUserNamePassword("user", "pass"),
 			WithKeepalive(0x0123),
 			WithCleanSession(true),
@@ -54,7 +54,7 @@ func TestProtocolViolation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
-		if err := cli.Connect(ctx, "cli"); err != nil {
+		if _, err := cli.Connect(ctx, "cli"); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 	}()
