@@ -32,7 +32,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
-			return err
+			return err //
 		}
 	}
 	c.sig = &signaller{}
