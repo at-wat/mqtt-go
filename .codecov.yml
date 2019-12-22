@@ -2,12 +2,8 @@ coverage:
   status:
     project:
       default:
-        threshold: 2
+        threshold: 5
     patch:
       default:
         against: parent
         target: 50%
-
-ignore:
-  - "examples/*"
-  - "examples/**/*"
