@@ -32,8 +32,8 @@ func WithUserNamePassword(userName, password string) ConnectOption {
 	}
 }
 
-// WithKeepalive sets keepalive interval in seconds.
-func WithKeepalive(interval uint16) ConnectOption {
+// WithKeepAlive sets keep alive interval in seconds.
+func WithKeepAlive(interval uint16) ConnectOption {
 	return func(o *ConnectOptions) error {
 		o.KeepAlive = interval
 		return nil
