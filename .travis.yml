@@ -1,5 +1,6 @@
 dist: bionic
 language: go
+services: docker
 
 branches:
   only:
@@ -14,7 +15,17 @@ env:
 
 install:
   - go mod download
+  - go build ./...
+
+before_script:
+  - docker-compose up -d
 
 script:
-  - go build ./...
   - go vet ./...
+  - go test . -tags integration
+
+after_script:
+  - docker-compose down
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
