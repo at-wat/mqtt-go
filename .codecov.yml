@@ -1,0 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+        if_not_found: success
+    patch:
+      default:
+        against: parent
+        target: 50%
