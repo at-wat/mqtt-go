@@ -12,9 +12,9 @@ func TestConnect(t *testing.T) {
 	ca, cb := net.Pipe()
 	cli := &BaseClient{Transport: cb}
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
-
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
 		_ = cli.Connect(ctx, "cli",
 			WithUserNamePassword("user", "pass"),
 			WithKeepalive(0x0123),
