@@ -91,7 +91,7 @@ func (d *DialOptions) dial(urlStr string) (*Client, error) {
 	default:
 		return nil, ErrUnsupportedProtocol
 	}
-	c.connStateUpdate(StateActive)
+	c.connStateUpdate(StateIdle)
 	c.connClosed = make(chan struct{})
 
 	go func() {

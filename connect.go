@@ -95,6 +95,7 @@ func (c *Client) Connect(ctx context.Context, clientID string, opts ...ConnectOp
 		if connAck.Code != ConnectionAccepted {
 			return errors.New(connAck.Code.String())
 		}
+		c.connStateUpdate(StateActive)
 	}
 	return nil
 }
