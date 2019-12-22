@@ -56,6 +56,8 @@ type Client interface {
 // Closer is the interface of connection closer.
 type Closer interface {
 	Close() error
+	Done() <-chan struct{}
+	Err() error
 }
 
 // ClientCloser groups Client and Closer interface

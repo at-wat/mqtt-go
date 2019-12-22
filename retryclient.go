@@ -17,11 +17,11 @@ type RetryClient struct {
 // If it is not acknowledged to be published, the message will be queued and
 // retried on the next connection.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
-	c.mu.Lock()
-	cli := c.Client
-	c.mu.Unlock()
 	go func() {
+		c.mu.Lock()
+		cli := c.Client
 		c.publish(ctx, cli, message)
+		c.mu.Unlock()
 	}()
 	return nil
 }
