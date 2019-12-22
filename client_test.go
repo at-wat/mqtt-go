@@ -3,6 +3,7 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestConnect(t *testing.T) {
 	b := make([]byte, 100)
 	n, err := ca.Read(b)
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
 	expected := []byte{
@@ -42,7 +43,7 @@ func TestConnect(t *testing.T) {
 		0x00, 0x04, 0x70, 0x61, 0x73, 0x73, // pass
 	}
 	if !bytes.Equal(expected, b[:n]) {
-		t.Fatalf("Expected CONNECT packet: \n  %v,\ngot: \n  %v", expected, b[:n])
+		t.Fatalf("Expected CONNECT packet: \n  '%v',\ngot: \n  '%v'", expected, b[:n])
 	}
 	cli.Close()
 }
@@ -55,7 +56,7 @@ func TestProtocolViolation(t *testing.T) {
 	defer cancel()
 	go func() {
 		if _, err := cli.Connect(ctx, "cli"); err != nil {
-			t.Fatalf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: '%v'", err)
 		}
 	}()
 
@@ -68,29 +69,45 @@ func TestProtocolViolation(t *testing.T) {
 
 	b := make([]byte, 100)
 	if _, err := ca.Read(b); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
 	// Send CONNACK.
 	if _, err := ca.Write([]byte{
 		0x20, 0x02, 0x00, 0x00,
 	}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
 	// Send SUBSCRIBE from broker.
 	if _, err := ca.Write([]byte{
 		0x80, 0x01, 0x00,
 	}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: ''%v''", err)
 	}
 
 	select {
 	case err := <-errCh:
 		if err != ErrInvalidPacket {
-			t.Errorf("Expected error against invalid packet: %v, got: %v", ErrInvalidPacket, err)
+			t.Errorf("Expected error against invalid packet: '%v', got: '%v'", ErrInvalidPacket, err)
 		}
 	case <-ctx.Done():
 		t.Error("Timeout")
+	}
+}
+
+func TestConnect_OptionsError(t *testing.T) {
+	errExpected := errors.New("an error")
+	sessionPresent, err := (&BaseClient{}).Connect(
+		context.Background(), "cli",
+		func(*ConnectOptions) error {
+			return errExpected
+		},
+	)
+	if err != errExpected {
+		t.Errorf("Expected error: ''%v'', got: ''%v''", errExpected, err)
+	}
+	if sessionPresent {
+		t.Errorf("SessionPresent flag must not be set on options error")
 	}
 }
