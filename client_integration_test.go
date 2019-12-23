@@ -69,7 +69,7 @@ func TestIntegration_Connect(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "Client"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -90,7 +90,7 @@ func TestIntegration_Publish(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "Client"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -136,7 +136,7 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "PubSubClient"+name); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -189,7 +189,7 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "SubUnsubClient"+name); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -218,7 +218,7 @@ func TestIntegration_Ping(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "PingClient"+name); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -253,7 +253,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "PubSubBenchClient"+name); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
 

@@ -24,7 +24,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					},
 				},
-				"ReconnectClient",
+				"ReconnectClient"+name,
 				WithKeepAlive(10),
 			)
 			if err != nil {
