@@ -25,6 +25,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 					},
 				},
 				"ReconnectClient",
+				WithKeepAlive(10),
 			)
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
