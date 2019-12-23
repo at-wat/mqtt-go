@@ -20,7 +20,7 @@ func TestIntegration_KeepAlive(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
-			if _, err := cli.Connect(ctx, "Client1",
+			if _, err := cli.Connect(ctx, "KeepAliveClient"+name,
 				WithKeepAlive(1),
 			); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)

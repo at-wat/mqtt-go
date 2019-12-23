@@ -48,6 +48,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		c.err = err
 		c.mu.Unlock()
 		c.connStateUpdate(StateClosed)
+		close(c.connClosed)
 	}()
 	payload := packString(clientID)
 

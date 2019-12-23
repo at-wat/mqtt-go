@@ -5,9 +5,6 @@ import (
 )
 
 func (c *BaseClient) serve() error {
-	defer func() {
-		close(c.connClosed)
-	}()
 	r := c.Transport
 	subBuffer := make(map[uint16]*Message)
 	for {
