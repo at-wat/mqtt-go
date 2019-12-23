@@ -6,10 +6,13 @@ import (
 	"io"
 )
 
-type protocolLevel byte
+// ProtocolLevel represents MQTT protocol level.
+type ProtocolLevel byte
 
+// ProtocolLevel values.
 const (
-	protocol311 protocolLevel = 0x04
+	ProtocolLevel3 ProtocolLevel = 0x03 // MQTT 3.1
+	ProtocolLevel4 ProtocolLevel = 0x04 // MQTT 3.1.1 (default)
 )
 
 type connectFlag byte
@@ -27,7 +30,9 @@ const (
 
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
-	o := &ConnectOptions{}
+	o := &ConnectOptions{
+		ProtocolLevel: ProtocolLevel4,
+	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
 			return false, err
@@ -86,7 +91,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		packetConnect.b(),
 		[]byte{
 			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
-			byte(protocol311),
+			byte(o.ProtocolLevel),
 			flag,
 		},
 		packUint16(o.KeepAlive),
@@ -156,6 +161,14 @@ func WithCleanSession(cleanSession bool) ConnectOption {
 func WithWill(will *Message) ConnectOption {
 	return func(o *ConnectOptions) error {
 		o.Will = will
+		return nil
+	}
+}
+
+// WithProtocolLevel sets protocol level.
+func WithProtocolLevel(level ProtocolLevel) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.ProtocolLevel = level
 		return nil
 	}
 }

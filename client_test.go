@@ -20,6 +20,7 @@ func TestConnect(t *testing.T) {
 			WithUserNamePassword("user", "pass"),
 			WithKeepAlive(0x0123),
 			WithCleanSession(true),
+			WithProtocolLevel(ProtocolLevel4),
 			WithWill(&Message{QoS: QoS1, Topic: "topic", Payload: []byte{0x01}}),
 		)
 	}()
