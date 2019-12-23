@@ -31,7 +31,7 @@ func (d dialerFunc) Dial() (mqtt.ClientCloser, error) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("   usage: %s server-host.domain\n", os.Args[0])
+		fmt.Printf("usage: %s server-host.domain\n", os.Args[0])
 		os.Exit(1)
 	}
 	host := os.Args[1]
