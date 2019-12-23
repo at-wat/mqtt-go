@@ -9,9 +9,9 @@ import (
 type RetryClient struct {
 	Client
 
-	pubQueue       []*Message     // unacknoledged messages
-	subQueue       []Subscription // unacknoledged subscriptions
-	subEstablished []Subscription // acknoledged subscriptions
+	pubQueue       []*Message       // unacknoledged messages
+	subQueue       [][]Subscription // unacknoledged subscriptions
+	subEstablished [][]Subscription // acknoledged subscriptions
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
@@ -76,12 +76,12 @@ func (c *RetryClient) subscribe(ctx context.Context, cli Client, subs ...Subscri
 			// User cancelled; don't queue.
 		default:
 			c.muQueue.Lock()
-			c.subQueue = append(c.subQueue, subs...)
+			c.subQueue = append(c.subQueue, subs)
 			c.muQueue.Unlock()
 		}
 	} else {
 		c.muQueue.Lock()
-		c.subEstablished = append(c.subEstablished, subs...)
+		c.subEstablished = append(c.subEstablished, subs)
 		c.muQueue.Unlock()
 	}
 }
@@ -98,7 +98,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
 	c.muQueue.Lock()
 	oldPubQueue := append([]*Message{}, c.pubQueue...)
-	oldSubQueue := append([]Subscription{}, c.subQueue...)
+	oldSubQueue := append([][]Subscription{}, c.subQueue...)
 	c.pubQueue = nil
 	c.subQueue = nil
 	c.muQueue.Unlock()
@@ -112,8 +112,8 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 
 	// Retry publish.
 	go func() {
-		if len(oldSubQueue) > 0 {
-			c.subscribe(ctx, cli, oldSubQueue...)
+		for _, sub := range oldSubQueue {
+			c.subscribe(ctx, cli, sub...)
 		}
 		for _, msg := range oldPubQueue {
 			c.publish(ctx, cli, msg)
@@ -125,11 +125,18 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 
 // Resubscribe subscribes all established subscriptions.
 func (c *RetryClient) Resubscribe(ctx context.Context) error {
-	if len(c.subEstablished) > 0 {
+	c.muQueue.Lock()
+	oldSubEstablished := append([][]Subscription{}, c.subEstablished...)
+	c.subEstablished = nil
+	c.muQueue.Unlock()
+
+	if len(oldSubEstablished) > 0 {
 		c.mu.Lock()
 		cli := c.Client
 		c.mu.Unlock()
-		c.subscribe(ctx, cli, c.subEstablished...)
+		for _, sub := range oldSubEstablished {
+			c.subscribe(ctx, cli, sub...)
+		}
 	}
 	return nil
 }

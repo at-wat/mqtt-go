@@ -11,35 +11,50 @@ type reconnectClient struct {
 }
 
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
-func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ConnectOption) Client {
+func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ConnectOption) (Client, error) {
 	rc := &RetryClient{}
-	cli := &reconnectClient{
-		Client: rc,
+
+	options := &ConnectOptions{}
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, err
+		}
 	}
+
 	done := make(chan struct{})
 	var doneOnce sync.Once
 	go func() {
-		clean := true
-		reconnWaitBase := 50 * time.Millisecond
+		clean := options.CleanSession
+		reconnWaitBase := 100 * time.Millisecond
 		reconnWaitMax := 10 * time.Second
 		reconnWait := reconnWaitBase
 		for {
 			if c, err := dialer.Dial(); err == nil {
 				optsCurr := append([]ConnectOption{}, opts...)
 				optsCurr = append(optsCurr, WithCleanSession(clean))
-				clean = false               // Clean only first time.
-				reconnWait = reconnWaitBase // Reset reconnect wait.
+				clean = false // Clean only first time.
 				rc.SetClient(ctx, c)
 
 				if present, err := rc.Connect(ctx, clientID, optsCurr...); err == nil {
+					reconnWait = reconnWaitBase // Reset reconnect wait.
 					doneOnce.Do(func() { close(done) })
 					if present {
 						rc.Resubscribe(ctx)
 					}
-					// Start keep alive.
-					go func() {
-						_ = KeepAlive(ctx, c, time.Second, time.Second)
-					}()
+					if options.KeepAlive > 0 {
+						// Start keep alive.
+						go func() {
+							timeout := time.Duration(options.KeepAlive) * time.Second / 2
+							if timeout < time.Second {
+								timeout = time.Second
+							}
+							_ = KeepAlive(
+								ctx, c,
+								time.Duration(options.KeepAlive)*time.Second,
+								timeout,
+							)
+						}()
+					}
 					select {
 					case <-c.Done():
 						if err := c.Err(); err == nil {
@@ -67,6 +82,7 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 	select {
 	case <-done:
 	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	return cli
+	return rc, nil
 }
