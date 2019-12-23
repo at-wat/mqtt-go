@@ -20,8 +20,6 @@ func main() {
 	}
 	host := os.Args[1]
 
-	done := make(chan struct{})
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -57,7 +55,7 @@ func main() {
 
 	cli.Handle(mqtt.HandlerFunc(func(msg *mqtt.Message) {
 		fmt.Printf("Received on %s: %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
-		close(done)
+		cancel()
 	}))
 
 	if err := cli.Subscribe(ctx, mqtt.Subscription{
@@ -80,7 +78,7 @@ func main() {
 	}
 
 	println("Waiting message on 'test' topic")
-	<-done
+	<-ctx.Done()
 
 	println("Disconnecting")
 
