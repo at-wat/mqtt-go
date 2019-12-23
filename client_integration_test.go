@@ -155,6 +155,8 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 			}
 
 			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
 			case msg, ok := <-chReceived:
 				if !ok {
 					t.Errorf("Connection closed unexpectedly")
