@@ -84,7 +84,7 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 			return nil, err
 		}
 		c.Transport = conn
-	case "tls", "mqtts":
+	case "tls", "ssl", "mqtts":
 		conn, err := tls.DialWithDialer(d.Dialer, "tcp", u.Host, d.TLSConfig)
 		if err != nil {
 			return nil, err
