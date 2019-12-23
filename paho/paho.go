@@ -2,16 +2,21 @@ package mqtt
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"time"
 
 	"github.com/at-wat/mqtt-go"
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
+var errNotConnected = errors.New("not connected")
+
 type pahoWrapper struct {
 	cli        mqtt.ClientCloser
 	serveMux   *mqtt.ServeMux
 	pahoConfig *paho.ClientOptions
+	mu         sync.Mutex
 }
 
 // NewClient creates paho.mqtt.golang interface wrapping at-wat/mqtt-go.
@@ -146,11 +151,14 @@ func (c *pahoWrapper) Connect() paho.Token {
 			}
 		}
 		cli.Handle(c.serveMux)
+		c.mu.Lock()
 		c.cli = cli
+		c.mu.Unlock()
 
 		opts := []mqtt.ConnectOption{
 			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
 			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
+			mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
 		}
 		if c.pahoConfig.WillEnabled {
 			opts = append(opts, mqtt.WithWill(&mqtt.Message{
@@ -161,14 +169,37 @@ func (c *pahoWrapper) Connect() paho.Token {
 			}))
 		}
 		_, token.err = c.cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
+		if token.err == nil {
+			if c.pahoConfig.KeepAlive > 0 {
+				// Start keep alive.
+				go func() {
+					timeout := c.pahoConfig.PingTimeout
+					if timeout < time.Second {
+						timeout = time.Second
+					}
+					_ = mqtt.KeepAlive(
+						context.Background(), cli,
+						time.Duration(c.pahoConfig.KeepAlive)*time.Second,
+						timeout,
+					)
+				}()
+			}
+		}
 		token.release()
 	}()
 	return token
 }
 
 func (c *pahoWrapper) Disconnect(quiesce uint) {
+	c.mu.Lock()
+	cli := c.cli
+	c.mu.Unlock()
+	if cli == nil {
+		return
+	}
+
 	time.Sleep(time.Duration(quiesce) * time.Millisecond)
-	_ = c.cli.Disconnect(context.Background())
+	_ = cli.Disconnect(context.Background())
 }
 
 func (c *pahoWrapper) Publish(topic string, qos byte, retained bool, payload interface{}) paho.Token {
@@ -183,7 +214,15 @@ func (c *pahoWrapper) Publish(topic string, qos byte, retained bool, payload int
 	}
 	token := newToken()
 	go func() {
-		token.err = c.cli.Publish(
+		c.mu.Lock()
+		cli := c.cli
+		c.mu.Unlock()
+		if cli == nil {
+			token.err = errNotConnected
+			return
+		}
+
+		token.err = cli.Publish(
 			context.Background(),
 			&mqtt.Message{
 				Topic:   topic,
@@ -199,7 +238,15 @@ func (c *pahoWrapper) Subscribe(topic string, qos byte, callback paho.MessageHan
 	token := newToken()
 	c.serveMux.Handle(topic, c.wrapMessageHandler(callback))
 	go func() {
-		token.err = c.cli.Subscribe(
+		c.mu.Lock()
+		cli := c.cli
+		c.mu.Unlock()
+		if cli == nil {
+			token.err = errNotConnected
+			return
+		}
+
+		token.err = cli.Subscribe(
 			context.Background(),
 			mqtt.Subscription{
 				Topic: topic,
@@ -224,7 +271,15 @@ func (c *pahoWrapper) SubscribeMultiple(filters map[string]byte, callback paho.M
 		)
 	}
 	go func() {
-		token.err = c.cli.Subscribe(context.Background(), subs...)
+		c.mu.Lock()
+		cli := c.cli
+		c.mu.Unlock()
+		if cli == nil {
+			token.err = errNotConnected
+			return
+		}
+
+		token.err = cli.Subscribe(context.Background(), subs...)
 		token.release()
 	}()
 	return token
@@ -233,7 +288,15 @@ func (c *pahoWrapper) SubscribeMultiple(filters map[string]byte, callback paho.M
 func (c *pahoWrapper) Unsubscribe(topics ...string) paho.Token {
 	token := newToken()
 	go func() {
-		token.err = c.cli.Unsubscribe(context.Background(), topics...)
+		c.mu.Lock()
+		cli := c.cli
+		c.mu.Unlock()
+		if cli == nil {
+			token.err = errNotConnected
+			return
+		}
+
+		token.err = cli.Unsubscribe(context.Background(), topics...)
 		token.release()
 	}()
 	return token
