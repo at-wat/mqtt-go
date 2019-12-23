@@ -32,7 +32,7 @@ func main() {
 		"private.key",
 	)
 	if err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -49,14 +49,14 @@ func main() {
 		mqtt.WithKeepAlive(30),
 	)
 	if err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	println("Connected")
 
 	cli.Handle(mqtt.HandlerFunc(func(msg *mqtt.Message) {
-		fmt.Printf("%s[%d]: %s\n", msg.Topic, int(msg.QoS), []byte(msg.Payload))
+		fmt.Printf("Received on %s: %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
 		close(done)
 	}))
 
@@ -64,7 +64,7 @@ func main() {
 		Topic: "test",
 		QoS:   mqtt.QoS1,
 	}); err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -75,7 +75,7 @@ func main() {
 		QoS:     mqtt.QoS1,
 		Payload: []byte("{\"message\": \"Hello\"}"),
 	}); err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -85,7 +85,7 @@ func main() {
 	println("Disconnecting")
 
 	if err := cli.Disconnect(ctx); err != nil {
-		fmt.Printf("error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
