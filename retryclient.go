@@ -20,10 +20,18 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	go func() {
 		c.mu.Lock()
 		cli := c.Client
-		c.publish(ctx, cli, message)
 		c.mu.Unlock()
+		c.publish(ctx, cli, message)
 	}()
 	return nil
+}
+
+// Subscribe the topic with lock.
+func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
+	c.mu.Lock()
+	cli := c.Client
+	c.mu.Unlock()
+	return cli.Subscribe(ctx, subs...)
 }
 
 func (c *RetryClient) publish(ctx context.Context, cli Client, message *Message) {

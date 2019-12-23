@@ -37,12 +37,16 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(time.Second)
 
 			chReceived := make(chan *Message, 100)
-			cli.(*reconnectClient).Client.(*RetryClient).Client.(*BaseClient).Handler = HandlerFunc(func(msg *Message) {
-				chReceived <- msg
-			})
+			cli.(*reconnectClient).Client.(*RetryClient).mu.Lock()
+			cli.(*reconnectClient).Client.(*RetryClient).Client.(*BaseClient).Handler =
+				HandlerFunc(func(msg *Message) {
+					chReceived <- msg
+				})
+			cli.(*reconnectClient).Client.(*RetryClient).mu.Unlock()
+
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}

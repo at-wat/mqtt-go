@@ -11,7 +11,7 @@ func init() {
 }
 
 func (c *BaseClient) initID() {
-	c.idLast = uint32(rand.Int31n(0xFFFE)) + 1
+	atomic.StoreUint32(&c.idLast, uint32(rand.Int31n(0xFFFE))+1)
 }
 
 func (c *BaseClient) newID() uint16 {
