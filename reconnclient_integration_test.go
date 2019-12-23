@@ -37,7 +37,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(500 * time.Millisecond)
 
 			chReceived := make(chan *Message, 100)
 			cli.(*reconnectClient).Client.(*RetryClient).Client.(*BaseClient).Handler = HandlerFunc(func(msg *Message) {
