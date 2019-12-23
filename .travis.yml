@@ -24,6 +24,7 @@ script:
   - go vet -tags integration ./...
   - |
     go test $(go list ./... | grep -v examples) \
+      -v \
       -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic
 
