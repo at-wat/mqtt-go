@@ -16,7 +16,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 			defer cancel()
 
 			chReceived := make(chan *Message, 100)
-			cli := NewReconnectClient(
+			cli, err := NewReconnectClient(
 				ctx,
 				&URLDialer{
 					URL: url,
@@ -26,12 +26,16 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 				},
 				"ReconnectClient",
 			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 			cli.Handle(HandlerFunc(func(msg *Message) {
 				chReceived <- msg
 			}))
 
 			// Close underlying client.
-			cli.(*reconnectClient).Client.(*RetryClient).Client.(ClientCloser).Close()
+			time.Sleep(time.Millisecond)
+			cli.(*RetryClient).Client.(ClientCloser).Close()
 
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
