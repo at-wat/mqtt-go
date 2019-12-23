@@ -1,12 +1,8 @@
 package mqtt
 
 import (
-	"errors"
 	"io"
 )
-
-// ErrInvalidPacket means that an invalid message is arrived from the broker.
-var ErrInvalidPacket = errors.New("invalid packet")
 
 func (c *BaseClient) serve() error {
 	defer func() {
@@ -40,12 +36,20 @@ func (c *BaseClient) serve() error {
 
 		switch pktType {
 		case packetConnAck:
+			connAck, err := (&pktConnAck{}).parse(pktFlag, contents)
+			if err != nil {
+				// Client must close connection if packet is invalid.
+				return err
+			}
 			select {
-			case c.sig.ConnAck() <- (&pktConnAck{}).parse(pktFlag, contents):
+			case c.sig.ConnAck() <- connAck:
 			default:
 			}
 		case packetPublish:
-			publish := (&pktPublish{}).parse(pktFlag, contents)
+			publish, err := (&pktPublish{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			switch publish.Message.QoS {
 			case QoS0:
 				c.mu.RLock()
@@ -80,7 +84,10 @@ func (c *BaseClient) serve() error {
 				subBuffer[publish.Message.ID] = &publish.Message
 			}
 		case packetPubAck:
-			pubAck := (&pktPubAck{}).parse(pktFlag, contents)
+			pubAck, err := (&pktPubAck{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if ch, ok := c.sig.PubAck(pubAck.ID); ok {
 				select {
 				case ch <- pubAck:
@@ -88,7 +95,10 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPubRec:
-			pubRec := (&pktPubRec{}).parse(pktFlag, contents)
+			pubRec, err := (&pktPubRec{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if ch, ok := c.sig.PubRec(pubRec.ID); ok {
 				select {
 				case ch <- pubRec:
@@ -96,7 +106,10 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPubRel:
-			pubRel := (&pktPubRel{}).parse(pktFlag, contents)
+			pubRel, err := (&pktPubRel{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if msg, ok := subBuffer[pubRel.ID]; ok {
 				// Ownership of the message is now transferred to the receiver.
 				c.mu.RLock()
@@ -116,7 +129,10 @@ func (c *BaseClient) serve() error {
 				return err
 			}
 		case packetPubComp:
-			pubComp := (&pktPubComp{}).parse(pktFlag, contents)
+			pubComp, err := (&pktPubComp{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if ch, ok := c.sig.PubComp(pubComp.ID); ok {
 				select {
 				case ch <- pubComp:
@@ -124,7 +140,10 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetSubAck:
-			subAck := (&pktSubAck{}).parse(pktFlag, contents)
+			subAck, err := (&pktSubAck{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if ch, ok := c.sig.SubAck(subAck.ID); ok {
 				select {
 				case ch <- subAck:
@@ -132,7 +151,10 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetUnsubAck:
-			unsubAck := (&pktUnsubAck{}).parse(pktFlag, contents)
+			unsubAck, err := (&pktUnsubAck{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			if ch, ok := c.sig.UnsubAck(unsubAck.ID); ok {
 				select {
 				case ch <- unsubAck:
@@ -140,7 +162,10 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPingResp:
-			pingResp := (&pktPingResp{}).parse(pktFlag, contents)
+			pingResp, err := (&pktPingResp{}).parse(pktFlag, contents)
+			if err != nil {
+				return err
+			}
 			select {
 			case c.sig.PingResp() <- pingResp:
 			default:

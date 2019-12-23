@@ -112,7 +112,7 @@ type pktPublish struct {
 	Message
 }
 
-func (p *pktPublish) parse(flag byte, contents []byte) *pktPublish {
+func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
 	p.Message.Dup = (publishFlag(flag) & publishFlagDup) != 0
 	p.Message.Retain = (publishFlag(flag) & publishFlagRetain) != 0
 	switch publishFlag(flag) & publishFlagQoSMask {
@@ -125,9 +125,13 @@ func (p *pktPublish) parse(flag byte, contents []byte) *pktPublish {
 	}
 
 	var n, nID int
-	n, p.Message.Topic = unpackString(contents)
+	var err error
+	n, p.Message.Topic, err = unpackString(contents)
+	if err != nil {
+		return nil, err
+	}
 	nID, p.Message.ID = unpackUint16(contents[n:])
 	p.Message.Payload = contents[n+nID:]
 
-	return p
+	return p, nil
 }

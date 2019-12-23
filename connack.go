@@ -40,9 +40,12 @@ type pktConnAck struct {
 	Code           ConnectionReturnCode
 }
 
-func (p *pktConnAck) parse(flag byte, contents []byte) *pktConnAck {
+func (p *pktConnAck) parse(flag byte, contents []byte) (*pktConnAck, error) {
+	if flag != 0 {
+		return nil, ErrInvalidPacket
+	}
 	return &pktConnAck{
 		SessionPresent: (contents[0]&0x01 != 0),
 		Code:           ConnectionReturnCode(contents[1]),
-	}
+	}, nil
 }

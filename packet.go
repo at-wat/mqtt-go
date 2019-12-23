@@ -1,8 +1,18 @@
 package mqtt
 
 import (
+	"errors"
 	"fmt"
 )
+
+// ErrInvalidRune means that the string has a rune not allowed in MQTT.
+var ErrInvalidRune = errors.New("invalid rune in UTF-8 string")
+
+// ErrInvalidPacket means that an invalid message is arrived from the broker.
+var ErrInvalidPacket = errors.New("invalid packet")
+
+// ErrInvalidPacketLength means that an invalid length of the message is arrived.
+var ErrInvalidPacketLength = errors.New("invalid packet length")
 
 type packetType byte
 
@@ -126,7 +136,18 @@ func unpackUint16(b []byte) (int, uint16) {
 	return 2, uint16(b[0])<<8 | uint16(b[1])
 }
 
-func unpackString(b []byte) (int, string) {
+func unpackString(b []byte) (int, string, error) {
 	nHeader, n := unpackUint16(b)
-	return int(n) + nHeader, string(b[nHeader : int(n)+nHeader])
+	if int(n)+nHeader > len(b) {
+		return 0, "", ErrInvalidPacketLength
+	}
+
+	// Validate UTF-8 runes according to MQTT-1.5.3-1 and MQTT-1.5.3-2.
+	rs := []rune(string(b[nHeader : int(n)+nHeader]))
+	for _, r := range rs {
+		if r == 0x0000 || (0xD800 <= r && r <= 0xDFFF) {
+			return 0, "", ErrInvalidRune
+		}
+	}
+	return int(n) + nHeader, string(rs), nil
 }
