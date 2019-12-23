@@ -17,19 +17,22 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/at-wat/mqtt-go"
 )
 
+type dialerFunc func() (mqtt.ClientCloser, error)
+
+func (d dialerFunc) Dial() (mqtt.ClientCloser, error) {
+	return d()
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("   usage: %s server-host.domain\n", os.Args[0])
-		fmt.Printf("requires: certificate.crt, private.key, root-CA.crt\n")
+		fmt.Printf("usage: %s server-host.domain\n", os.Args[0])
 		os.Exit(1)
 	}
 	host := os.Args[1]
@@ -37,37 +40,23 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	tlsConfig, err := newTLSConfig(
-		host,
-		"root-CA.crt",
-		"certificate.crt",
-		"private.key",
-	)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
-
 	println("Connecting to", host)
 
 	cli, err := mqtt.NewReconnectClient(ctx,
 		// Dialer to connect/reconnect to the server.
-		&mqtt.URLDialer{
-			URL: fmt.Sprintf("mqtts://%s:8883", host),
-			Options: []mqtt.DialOption{
-				mqtt.WithTLSConfig(tlsConfig),
-			},
-		},
+		dialerFunc(func() (mqtt.ClientCloser, error) {
+			// Presign URL here.
+			url := fmt.Sprintf("wss://%s:9443?token=%x",
+				host, time.Now().UnixNano(),
+			)
+			println("new URL:", url)
+			return mqtt.Dial(url,
+				mqtt.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+			)
+		}),
 		"sample", // Client ID
 		mqtt.WithConnectOption(
 			mqtt.WithKeepAlive(30),
-			mqtt.WithWill(
-				&mqtt.Message{
-					Topic:   "test",
-					QoS:     mqtt.QoS1,
-					Payload: []byte("{\"message\": \"Bye\"}"),
-				},
-			),
 		),
 		mqtt.WithPingInterval(10*time.Second),
 		mqtt.WithTimeout(5*time.Second),
@@ -85,24 +74,16 @@ func main() {
 
 	mux.Handle("#", // Handle all topics by this handler.
 		mqtt.HandlerFunc(func(msg *mqtt.Message) {
-			fmt.Printf("Wildcard (%s): %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
-		}),
-	)
-	mux.Handle("stop", // Handle 'stop' topic by this handler.
-		mqtt.HandlerFunc(func(msg *mqtt.Message) {
-			fmt.Printf("Stop: %s (QoS: %d)\n", []byte(msg.Payload), int(msg.QoS))
+			fmt.Printf("Received (%s): %s (QoS: %d)\n",
+				msg.Topic, []byte(msg.Payload), int(msg.QoS),
+			)
 			cancel()
 		}),
 	)
 
-	// Subscribe two topics.
 	if err := cli.Subscribe(ctx,
 		mqtt.Subscription{
 			Topic: "test",
-			QoS:   mqtt.QoS1,
-		},
-		mqtt.Subscription{
-			Topic: "stop",
 			QoS:   mqtt.QoS1,
 		},
 	); err != nil {
@@ -121,7 +102,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	println("Waiting message on 'stop' topic")
+	println("Waiting message on 'test' topic")
 	<-ctx.Done()
 
 	println("Disconnecting")
@@ -132,25 +113,4 @@ func main() {
 	}
 
 	println("Disconnected")
-}
-
-// newTLSConfig creates TLS configuration with client certificates.
-func newTLSConfig(host, caFile, certFile, privateKeyFile string) (*tls.Config, error) {
-	certpool := x509.NewCertPool()
-	cas, err := ioutil.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-	certpool.AppendCertsFromPEM(cas)
-
-	cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tls.Config{
-		ServerName:   host,
-		RootCAs:      certpool,
-		Certificates: []tls.Certificate{cert},
-	}, nil
 }
