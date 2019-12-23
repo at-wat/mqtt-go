@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 	"time"
@@ -45,8 +46,13 @@ func main() {
 		// Dialer to connect/reconnect to the server.
 		dialerFunc(func() (mqtt.ClientCloser, error) {
 			// Presign URL here.
-			url := fmt.Sprintf("wss://%s:443?token=%s", host, "generated-token")
-			return mqtt.Dial(url)
+			url := fmt.Sprintf("wss://%s:9443?token=%x",
+				host, time.Now().UnixNano(),
+			)
+			println("new URL:", url)
+			return mqtt.Dial(url,
+				mqtt.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+			)
 		}),
 		"sample", // Client ID
 		mqtt.WithConnectOption(
