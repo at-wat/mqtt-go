@@ -27,7 +27,6 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 	if o.AutoReconnect {
 		panic("paho style auto-reconnect is not supported")
 	}
-	println(o.Servers[0].String())
 
 	return w
 }
