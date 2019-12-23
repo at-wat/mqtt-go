@@ -182,7 +182,7 @@ func (c *BaseClient) serve() error {
 			default:
 			}
 		default:
-			// must close connection if the client encounted protocol violation.
+			// must close connection if the client encountered protocol violation.
 			return ErrInvalidPacket
 		}
 	}
