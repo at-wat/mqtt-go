@@ -81,21 +81,21 @@ func remainingLength(n int) []byte {
 		return []byte{byte(n)}
 	case n <= 0x7FFF:
 		return []byte{
-			byte(n>>7) | 0x80,
-			byte(n) & 0x7F,
+			byte(n) | 0x80,
+			byte(n>>7) & 0x7F,
 		}
 	case n <= 0x7FFFFF:
 		return []byte{
-			byte(n>>14) | 0x80,
+			byte(n) | 0x80,
 			byte(n>>7) | 0x80,
-			byte(n) & 0x7F,
+			byte(n>>14) & 0x7F,
 		}
 	case n <= 0x7FFFFFFF:
 		return []byte{
-			byte(n>>21) | 0x80,
-			byte(n>>14) | 0x80,
+			byte(n) | 0x80,
 			byte(n>>7) | 0x80,
-			byte(n) & 0x7F,
+			byte(n>>14) | 0x80,
+			byte(n>>21) & 0x7F,
 		}
 	}
 	panic("remaining length overflow")
