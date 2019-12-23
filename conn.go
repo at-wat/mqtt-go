@@ -16,6 +16,22 @@ var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 // ErrClosedTransport means that the underlying connection is closed.
 var ErrClosedTransport = errors.New("read/write on closed transport")
 
+// URLDialer is a Dialer using URL string.
+type URLDialer struct {
+	URL     string
+	Options []DialOption
+}
+
+// Dialer is an interface to create connection.
+type Dialer interface {
+	Dial() (ClientCloser, error)
+}
+
+// Dial creates connection using its values.
+func (d *URLDialer) Dial() (ClientCloser, error) {
+	return Dial(d.URL, d.Options...)
+}
+
 // Dial creates MQTT client using URL string.
 func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
 	o := &DialOptions{
@@ -112,4 +128,16 @@ func (c *BaseClient) connStateUpdate(newState ConnState) {
 // Close force closes MQTT connection.
 func (c *BaseClient) Close() error {
 	return c.Transport.Close()
+}
+
+// Done is a channel to signal connection close.
+func (c *BaseClient) Done() <-chan struct{} {
+	return c.connClosed
+}
+
+// Err returns connection error.
+func (c *BaseClient) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.err
 }

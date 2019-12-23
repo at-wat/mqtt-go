@@ -48,20 +48,26 @@ func (c *BaseClient) serve() error {
 			publish := (&pktPublish{}).parse(pktFlag, contents)
 			switch publish.Message.QoS {
 			case QoS0:
-				if c.Handler != nil {
-					c.Handler.Serve(&publish.Message)
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(&publish.Message)
 				}
 			case QoS1:
 				// Ownership of the message is now transferred to the receiver.
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(&publish.Message)
+				}
 				pktPubAck := pack(
 					packetPubAck.b()|packetFromClient.b(),
 					packUint16(publish.Message.ID),
 				)
 				if err := c.write(pktPubAck); err != nil {
 					return err
-				}
-				if c.Handler != nil {
-					c.Handler.Serve(&publish.Message)
 				}
 			case QoS2:
 				pktPubRec := pack(
@@ -93,8 +99,11 @@ func (c *BaseClient) serve() error {
 			pubRel := (&pktPubRel{}).parse(pktFlag, contents)
 			if msg, ok := subBuffer[pubRel.ID]; ok {
 				// Ownership of the message is now transferred to the receiver.
-				if c.Handler != nil {
-					c.Handler.Serve(msg)
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(msg)
 				}
 				delete(subBuffer, pubRel.ID)
 			}

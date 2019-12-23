@@ -10,11 +10,10 @@ import (
 type BaseClient struct {
 	// Transport is an underlying connection. Typically net.Conn.
 	Transport io.ReadWriteCloser
-	// Handler of incoming messages.
-	Handler Handler
 	// ConnState is called if the connection state is changed.
 	ConnState func(ConnState, error)
 
+	handler    Handler
 	sig        *signaller
 	mu         sync.RWMutex
 	connState  ConnState
@@ -22,6 +21,13 @@ type BaseClient struct {
 	connClosed chan struct{}
 	muWrite    sync.Mutex
 	idLast     uint32
+}
+
+// Handle registers the message handler.
+func (c *BaseClient) Handle(handler Handler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.handler = handler
 }
 
 // WithUserNamePassword sets plain text auth information used in Connect.
