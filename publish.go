@@ -122,6 +122,8 @@ func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
 		p.Message.QoS = QoS1
 	case publishFlagQoS2:
 		p.Message.QoS = QoS2
+	default:
+		return nil, ErrInvalidPacket
 	}
 
 	var n, nID int

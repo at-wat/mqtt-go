@@ -137,6 +137,9 @@ func unpackUint16(b []byte) (int, uint16) {
 }
 
 func unpackString(b []byte) (int, string, error) {
+	if len(b) < 2 {
+		return 0, "", ErrInvalidPacketLength
+	}
 	nHeader, n := unpackUint16(b)
 	if int(n)+nHeader > len(b) {
 		return 0, "", ErrInvalidPacketLength
