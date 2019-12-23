@@ -27,15 +27,16 @@ func ExampleClient() {
 	if err != nil {
 		panic(err)
 	}
-	baseCli.Handler = HandlerFunc(func(msg *Message) {
-		fmt.Printf("%s[%d]: %s", msg.Topic, int(msg.QoS), []byte(msg.Payload))
-		close(done)
-	})
 
 	// store as Client to make it easy to enable high level wrapper later
 	var cli Client = baseCli
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	cli.Handle(HandlerFunc(func(msg *Message) {
+		fmt.Printf("%s[%d]: %s", msg.Topic, int(msg.QoS), []byte(msg.Payload))
+		close(done)
+	}))
 
 	if _, err := cli.Connect(ctx, "TestClient", WithCleanSession(true)); err != nil {
 		panic(err)
@@ -123,9 +124,6 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 			}
 
 			chReceived := make(chan *Message, 100)
-			cli.Handler = HandlerFunc(func(msg *Message) {
-				chReceived <- msg
-			})
 			cli.ConnState = func(s ConnState, err error) {
 				switch s {
 				case StateActive:
@@ -141,6 +139,10 @@ func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
 			if _, err := cli.Connect(ctx, "Client1"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
+
+			cli.Handle(HandlerFunc(func(msg *Message) {
+				chReceived <- msg
+			}))
 
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -240,9 +242,6 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 			}
 
 			chReceived := make(chan *Message, 100)
-			cli.Handler = HandlerFunc(func(msg *Message) {
-				chReceived <- msg
-			})
 			cli.ConnState = func(s ConnState, err error) {
 				switch s {
 				case StateActive:
@@ -257,6 +256,10 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 			if _, err := cli.Connect(ctx, "Client1"); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
+
+			cli.Handle(HandlerFunc(func(msg *Message) {
+				chReceived <- msg
+			}))
 
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)

@@ -45,8 +45,11 @@ func (c *BaseClient) serve() error {
 			}
 		case packetPublish:
 			publish := (&pktPublish{}).parse(pktFlag, contents)
-			if c.Handler != nil {
-				c.Handler.Serve(&publish.Message)
+			c.mu.RLock()
+			handler := c.handler
+			c.mu.RUnlock()
+			if handler != nil {
+				handler.Serve(&publish.Message)
 			}
 			switch publish.Message.QoS {
 			case QoS1:

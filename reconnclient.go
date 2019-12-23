@@ -8,7 +8,6 @@ import (
 
 type reconnectClient struct {
 	Client
-	Dialer Dialer
 }
 
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
@@ -16,7 +15,6 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 	rc := &RetryClient{}
 	cli := &reconnectClient{
 		Client: rc,
-		Dialer: dialer,
 	}
 	done := make(chan struct{})
 	var doneOnce sync.Once
@@ -31,12 +29,12 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 				optsCurr = append(optsCurr, WithCleanSession(clean))
 				clean = false               // Clean only first time.
 				reconnWait = reconnWaitBase // Reset reconnect wait.
+				rc.SetClient(ctx, c)
 
-				if present, err := c.Connect(ctx, clientID, optsCurr...); err == nil {
-					rc.SetClient(ctx, c)
+				if present, err := rc.Connect(ctx, clientID, optsCurr...); err == nil {
 					doneOnce.Do(func() { close(done) })
 					if present {
-						// Do resubscribe here.
+						rc.Resubscribe(ctx)
 					}
 					// Start keep alive.
 					go func() {

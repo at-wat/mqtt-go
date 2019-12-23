@@ -15,6 +15,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
+			chReceived := make(chan *Message, 100)
 			cli := NewReconnectClient(
 				ctx,
 				&URLDialer{
@@ -25,9 +26,16 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 				},
 				"ReconnectClient",
 			)
+			cli.Handle(HandlerFunc(func(msg *Message) {
+				chReceived <- msg
+			}))
+
 			// Close underlying client.
 			cli.(*reconnectClient).Client.(*RetryClient).Client.(ClientCloser).Close()
 
+			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 			if err := cli.Publish(ctx, &Message{
 				Topic:   "test",
 				QoS:     QoS1,
@@ -37,19 +45,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			time.Sleep(2 * time.Second)
-
-			chReceived := make(chan *Message, 100)
-			cli.(*reconnectClient).Client.(*RetryClient).mu.Lock()
-			cli.(*reconnectClient).Client.(*RetryClient).Client.(*BaseClient).Handler =
-				HandlerFunc(func(msg *Message) {
-					chReceived <- msg
-				})
-			cli.(*reconnectClient).Client.(*RetryClient).mu.Unlock()
-
-			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+			time.Sleep(time.Second)
 
 			select {
 			case <-ctx.Done():

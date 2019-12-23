@@ -51,6 +51,7 @@ type Client interface {
 	Subscribe(ctx context.Context, subs ...Subscription) error
 	Unsubscribe(ctx context.Context, subs ...string) error
 	Ping(ctx context.Context) error
+	Handle(Handler)
 }
 
 // Closer is the interface of connection closer.
