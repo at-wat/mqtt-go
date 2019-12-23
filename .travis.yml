@@ -26,6 +26,7 @@ script:
     go test $(go list ./... | grep -v examples) \
       -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic
+  - (cd paho; go vet -tags integration ./...)
 
 after_script:
   - docker-compose down
