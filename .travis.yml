@@ -27,6 +27,7 @@ script:
       -v \
       -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic
+  - (cd paho; go vet ./...)
 
 after_script:
   - docker-compose down
