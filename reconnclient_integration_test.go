@@ -24,8 +24,9 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					},
 				},
-				"ReconnectClient",
+				"ReconnectClient"+name,
 				WithKeepAlive(10),
+				WithCleanSession(true),
 			)
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)

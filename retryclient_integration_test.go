@@ -23,7 +23,7 @@ func TestIntegration_RetryClient(t *testing.T) {
 			var cli RetryClient
 			cli.SetClient(ctx, cliBase)
 
-			if _, err := cli.Connect(ctx, "Client1"); err != nil {
+			if _, err := cli.Connect(ctx, "RetryClient"+name); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
