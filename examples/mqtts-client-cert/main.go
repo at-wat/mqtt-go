@@ -51,14 +51,22 @@ func main() {
 	println("Connecting to", host)
 
 	cli, err := mqtt.NewReconnectClient(ctx,
+		// Dialer to connect/reconnect to the server.
 		&mqtt.URLDialer{
 			URL: fmt.Sprintf("mqtts://%s:8883", host),
 			Options: []mqtt.DialOption{
 				mqtt.WithTLSConfig(tlsConfig),
 			},
 		},
-		"sample",
+		"sample", // Client ID
 		mqtt.WithKeepAlive(30),
+		mqtt.WithWill(
+			&mqtt.Message{
+				Topic:   "test",
+				QoS:     mqtt.QoS1,
+				Payload: []byte("{\"message\": \"Bye\"}"),
+			},
+		),
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -67,15 +75,32 @@ func main() {
 
 	println("Connected")
 
-	cli.Handle(mqtt.HandlerFunc(func(msg *mqtt.Message) {
-		fmt.Printf("Received on %s: %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
-		cancel()
-	}))
+	mux := &mqtt.ServeMux{}
+	cli.Handle(mux) // Register muxer as a low level handler.
 
-	if err := cli.Subscribe(ctx, mqtt.Subscription{
-		Topic: "test",
-		QoS:   mqtt.QoS1,
-	}); err != nil {
+	mux.Handle("#", // Handle all topics by this handler.
+		mqtt.HandlerFunc(func(msg *mqtt.Message) {
+			fmt.Printf("Wildcard (%s): %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
+		}),
+	)
+	mux.Handle("stop", // Handle 'test' topic by this handler.
+		mqtt.HandlerFunc(func(msg *mqtt.Message) {
+			fmt.Printf("Stop: %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
+			cancel()
+		}),
+	)
+
+	// Subscribe two topics.
+	if err := cli.Subscribe(ctx,
+		mqtt.Subscription{
+			Topic: "test",
+			QoS:   mqtt.QoS1,
+		},
+		mqtt.Subscription{
+			Topic: "stop",
+			QoS:   mqtt.QoS1,
+		},
+	); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -91,7 +116,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	println("Waiting message on 'test' topic")
+	println("Waiting message on 'stop' topic")
 	<-ctx.Done()
 
 	println("Disconnecting")
@@ -104,7 +129,8 @@ func main() {
 	println("Disconnected")
 }
 
-func newTLSConfig(host, caFile, crtFile, keyFile string) (*tls.Config, error) {
+// newTLSConfig creates TLS configuration with client certificates.
+func newTLSConfig(host, caFile, certFile, privateKeyFile string) (*tls.Config, error) {
 	certpool := x509.NewCertPool()
 	cas, err := ioutil.ReadFile(caFile)
 	if err != nil {
@@ -112,7 +138,7 @@ func newTLSConfig(host, caFile, crtFile, keyFile string) (*tls.Config, error) {
 	}
 	certpool.AppendCertsFromPEM(cas)
 
-	cert, err := tls.LoadX509KeyPair(crtFile, keyFile)
+	cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
 	if err != nil {
 		return nil, err
 	}
