@@ -6,10 +6,13 @@ import (
 	"io"
 )
 
-type protocolLevel byte
+// ProtocolLevel represents MQTT protocol level.
+type ProtocolLevel byte
 
+// ProtocolLevel values.
 const (
-	protocol311 protocolLevel = 0x04
+	ProtocolLevel3 ProtocolLevel = 0x03 // MQTT 3.1
+	ProtocolLevel4 ProtocolLevel = 0x04 // MQTT 3.1.1 (default)
 )
 
 type connectFlag byte
@@ -27,7 +30,9 @@ const (
 
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
-	o := &ConnectOptions{}
+	o := &ConnectOptions{
+		ProtocolLevel: ProtocolLevel4,
+	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
 			return false, err
@@ -86,7 +91,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		packetConnect.b(),
 		[]byte{
 			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
-			byte(protocol311),
+			byte(o.ProtocolLevel),
 			flag,
 		},
 		packUint16(o.KeepAlive),
@@ -111,5 +116,59 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		}
 		c.connStateUpdate(StateActive)
 		return connAck.SessionPresent, nil
+	}
+}
+
+// ConnectOptions represents options for Connect.
+type ConnectOptions struct {
+	UserName      string
+	Password      string
+	CleanSession  bool
+	KeepAlive     uint16
+	Will          *Message
+	ProtocolLevel ProtocolLevel
+}
+
+// ConnectOption sets option for Connect.
+type ConnectOption func(*ConnectOptions) error
+
+// WithUserNamePassword sets plain text auth information used in Connect.
+func WithUserNamePassword(userName, password string) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.UserName = userName
+		o.Password = password
+		return nil
+	}
+}
+
+// WithKeepAlive sets keep alive interval in seconds.
+func WithKeepAlive(interval uint16) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.KeepAlive = interval
+		return nil
+	}
+}
+
+// WithCleanSession sets clean session flag.
+func WithCleanSession(cleanSession bool) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.CleanSession = cleanSession
+		return nil
+	}
+}
+
+// WithWill sets will message.
+func WithWill(will *Message) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.Will = will
+		return nil
+	}
+}
+
+// WithProtocolLevel sets protocol level.
+func WithProtocolLevel(level ProtocolLevel) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.ProtocolLevel = level
+		return nil
 	}
 }

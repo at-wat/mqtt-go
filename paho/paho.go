@@ -159,6 +159,7 @@ func (c *pahoWrapper) Connect() paho.Token {
 			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
 			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
 			mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
+			mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
 		}
 		if c.pahoConfig.WillEnabled {
 			opts = append(opts, mqtt.WithWill(&mqtt.Message{

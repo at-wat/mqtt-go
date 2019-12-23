@@ -31,18 +31,6 @@ type Subscription struct {
 	QoS   QoS
 }
 
-// ConnectOptions represents options for Connect.
-type ConnectOptions struct {
-	UserName     string
-	Password     string
-	CleanSession bool
-	KeepAlive    uint16
-	Will         *Message
-}
-
-// ConnectOption sets option for Connect.
-type ConnectOption func(*ConnectOptions) error
-
 // Client is the interface of MQTT client.
 type Client interface {
 	Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error)
