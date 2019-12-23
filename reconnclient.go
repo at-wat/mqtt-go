@@ -24,13 +24,12 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 		clean := true
 		for {
 			if c, err := dialer.Dial(); err == nil {
-				rc.SetClient(ctx, c)
-
 				optsCurr := append([]ConnectOption{}, opts...)
 				optsCurr = append(optsCurr, WithCleanSession(clean))
 				clean = false // Clean only first time.
 
-				if present, err := rc.Connect(ctx, clientID, optsCurr...); err == nil {
+				if present, err := c.Connect(ctx, clientID, optsCurr...); err == nil {
+					rc.SetClient(ctx, c)
 					doneOnce.Do(func() { close(done) })
 					if present {
 						// Do resubscribe here.
