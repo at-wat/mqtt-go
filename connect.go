@@ -113,3 +113,49 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		return connAck.SessionPresent, nil
 	}
 }
+
+// ConnectOptions represents options for Connect.
+type ConnectOptions struct {
+	UserName      string
+	Password      string
+	CleanSession  bool
+	KeepAlive     uint16
+	Will          *Message
+	ProtocolLevel ProtocolLevel
+}
+
+// ConnectOption sets option for Connect.
+type ConnectOption func(*ConnectOptions) error
+
+// WithUserNamePassword sets plain text auth information used in Connect.
+func WithUserNamePassword(userName, password string) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.UserName = userName
+		o.Password = password
+		return nil
+	}
+}
+
+// WithKeepAlive sets keep alive interval in seconds.
+func WithKeepAlive(interval uint16) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.KeepAlive = interval
+		return nil
+	}
+}
+
+// WithCleanSession sets clean session flag.
+func WithCleanSession(cleanSession bool) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.CleanSession = cleanSession
+		return nil
+	}
+}
+
+// WithWill sets will message.
+func WithWill(will *Message) ConnectOption {
+	return func(o *ConnectOptions) error {
+		o.Will = will
+		return nil
+	}
+}
