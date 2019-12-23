@@ -7,6 +7,10 @@
 Low layer, context-based synchronous
 
 
+## Reference
+- [MQTT Version 3.1.1 Plus Errata 01](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
+
+
 ## License
 
 This package is licensed under [Apache License Version 2.0](./LICENSE).
