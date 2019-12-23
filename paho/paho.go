@@ -14,6 +14,8 @@ type pahoWrapper struct {
 	pahoConfig *paho.ClientOptions
 }
 
+// NewClient creates paho.mqtt.golang interface wrapping at-wat/mqtt-go.
+// It's very experimental and some of the options are not supported.
 func NewClient(o *paho.ClientOptions) paho.Client {
 	w := &pahoWrapper{
 		pahoConfig: o,
