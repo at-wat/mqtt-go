@@ -28,7 +28,7 @@ type reconnectClient struct {
 func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ConnectOption) (Client, error) {
 	rc := &RetryClient{}
 
-	options := &ConnectOptions{}
+	options := &ConnectOptions{CleanSession: true}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
 			return nil, err
@@ -39,7 +39,7 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 	var doneOnce sync.Once
 	go func() {
 		clean := options.CleanSession
-		reconnWaitBase := 100 * time.Millisecond
+		reconnWaitBase := time.Second
 		reconnWaitMax := 10 * time.Second
 		reconnWait := reconnWaitBase
 		for {
