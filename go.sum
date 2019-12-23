@@ -1,3 +1,7 @@
+github.com/at-wat/mqtt-go/paho v0.0.0-20191223132131-2cda1b544396 h1:FPrOx/pA5cqgFBtnjcd35GFXYzt3k/mn/7xN0xMUDTI=
+github.com/at-wat/mqtt-go/paho v0.0.0-20191223132131-2cda1b544396/go.mod h1:DNKbScZK2jeUz4cqzfqutfpDdHOoY/2r5xbExFRxB4w=
+github.com/eclipse/paho.mqtt.golang v1.2.0 h1:1F8mhG9+aO5/xpdtFkW4SxOJB67ukuDC3t2y2qayIX0=
+github.com/eclipse/paho.mqtt.golang v1.2.0/go.mod h1:H9keYFcgq3Qr5OUJm/JZI/i6U7joQ8SYLhZwfeOo6Ts=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 h1:efeOvDhwQ29Dj3SdAV/MJf8oukgn+8D8WgaCaRMchF8=
 golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
