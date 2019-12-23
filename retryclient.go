@@ -52,8 +52,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) error {
 	c.Client = cli
 
 	c.muMsg.Lock()
-	var oldQueue []*Message
-	copy(oldQueue, c.queue)
+	oldQueue := append([]*Message{}, c.queue...)
 	c.queue = nil
 	c.muMsg.Unlock()
 
