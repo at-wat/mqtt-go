@@ -13,6 +13,7 @@ func (c *BaseClient) serve() error {
 		close(c.connClosed)
 	}()
 	r := c.Transport
+	subBuffer := make(map[uint16]*Message)
 	for {
 		pktTypeBytes := make([]byte, 1)
 		if _, err := io.ReadFull(r, pktTypeBytes); err != nil {
@@ -45,14 +46,22 @@ func (c *BaseClient) serve() error {
 			}
 		case packetPublish:
 			publish := (&pktPublish{}).parse(pktFlag, contents)
-			c.mu.RLock()
-			handler := c.handler
-			c.mu.RUnlock()
-			if handler != nil {
-				handler.Serve(&publish.Message)
-			}
 			switch publish.Message.QoS {
+			case QoS0:
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(&publish.Message)
+				}
 			case QoS1:
+				// Ownership of the message is now transferred to the receiver.
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(&publish.Message)
+				}
 				pktPubAck := pack(
 					packetPubAck.b()|packetFromClient.b(),
 					packUint16(publish.Message.ID),
@@ -68,6 +77,7 @@ func (c *BaseClient) serve() error {
 				if err := c.write(pktPubRec); err != nil {
 					return err
 				}
+				subBuffer[publish.Message.ID] = &publish.Message
 			}
 		case packetPubAck:
 			pubAck := (&pktPubAck{}).parse(pktFlag, contents)
@@ -87,6 +97,17 @@ func (c *BaseClient) serve() error {
 			}
 		case packetPubRel:
 			pubRel := (&pktPubRel{}).parse(pktFlag, contents)
+			if msg, ok := subBuffer[pubRel.ID]; ok {
+				// Ownership of the message is now transferred to the receiver.
+				c.mu.RLock()
+				handler := c.handler
+				c.mu.RUnlock()
+				if handler != nil {
+					handler.Serve(msg)
+				}
+				delete(subBuffer, pubRel.ID)
+			}
+
 			pktPubComp := pack(
 				packetPubComp.b()|packetFromClient.b(),
 				packUint16(pubRel.ID),
