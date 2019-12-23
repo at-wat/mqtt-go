@@ -106,11 +106,8 @@ func newTLSConfig(host, caFile, crtFile, keyFile string) (*tls.Config, error) {
 	}
 
 	return &tls.Config{
-		RootCAs:            certpool,
-		ClientAuth:         tls.NoClientCert,
-		ClientCAs:          nil,
-		InsecureSkipVerify: false,
-		ServerName:         host,
-		Certificates:       []tls.Certificate{cert},
+		ServerName:   host,
+		RootCAs:      certpool,
+		Certificates: []tls.Certificate{cert},
 	}, nil
 }
