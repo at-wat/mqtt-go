@@ -67,6 +67,9 @@ func main() {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
+
+	println("Publishing one message to 'test' topic")
+
 	if err := cli.Publish(ctx, &mqtt.Message{
 		Topic:   "test",
 		QoS:     mqtt.QoS1,
@@ -76,11 +79,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	println("Waiting message on 'test' topic")
 	<-done
+
+	println("Disconnecting")
+
 	if err := cli.Disconnect(ctx); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
+
+	println("Disconnected")
 }
 
 func newTLSConfig(host, caFile, crtFile, keyFile string) (*tls.Config, error) {
