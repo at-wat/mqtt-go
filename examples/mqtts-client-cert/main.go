@@ -34,7 +34,7 @@ func main() {
 	}
 	host := os.Args[1]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	tlsConfig, err := newTLSConfig(
@@ -60,6 +60,7 @@ func main() {
 		},
 		"sample", // Client ID
 		mqtt.WithKeepAlive(30),
+		mqtt.WithCleanSession(true),
 		mqtt.WithWill(
 			&mqtt.Message{
 				Topic:   "test",
@@ -83,9 +84,9 @@ func main() {
 			fmt.Printf("Wildcard (%s): %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
 		}),
 	)
-	mux.Handle("stop", // Handle 'test' topic by this handler.
+	mux.Handle("stop", // Handle 'stop' topic by this handler.
 		mqtt.HandlerFunc(func(msg *mqtt.Message) {
-			fmt.Printf("Stop: %s (QoS: %d)\n", msg.Topic, []byte(msg.Payload), int(msg.QoS))
+			fmt.Printf("Stop: %s (QoS: %d)\n", []byte(msg.Payload), int(msg.QoS))
 			cancel()
 		}),
 	)
