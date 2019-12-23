@@ -2,7 +2,6 @@ package mqtt
 
 import (
 	"context"
-	"net"
 	"time"
 
 	"github.com/at-wat/mqtt-go"
@@ -26,26 +25,7 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 	if o.AutoReconnect {
 		panic("paho style auto-reconnect is not supported")
 	}
-
-	cli, err := mqtt.Dial(
-		o.Servers[0].String(),
-		mqtt.WithTLSConfig(o.TLSConfig),
-	)
-	if err != nil {
-		dummyConn, _ := net.Pipe()
-		dummyConn.Close()
-		cli = &mqtt.BaseClient{Transport: dummyConn}
-	}
-	cli.ConnState = func(s mqtt.ConnState, err error) {
-		switch s {
-		case mqtt.StateActive:
-			o.OnConnect(w)
-		case mqtt.StateClosed:
-			o.OnConnectionLost(w, err)
-		}
-	}
-	cli.Handle(w.serveMux)
-	w.cli = cli
+	println(o.Servers[0].String())
 
 	return w
 }
@@ -147,6 +127,26 @@ func (c *pahoWrapper) IsConnectionOpen() bool {
 func (c *pahoWrapper) Connect() paho.Token {
 	token := newToken()
 	go func() {
+		cli, err := mqtt.Dial(
+			c.pahoConfig.Servers[0].String(),
+			mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
+		)
+		if err != nil {
+			token.err = err
+			token.release()
+			return
+		}
+		cli.ConnState = func(s mqtt.ConnState, err error) {
+			switch s {
+			case mqtt.StateActive:
+				c.pahoConfig.OnConnect(c)
+			case mqtt.StateClosed:
+				c.pahoConfig.OnConnectionLost(c, err)
+			}
+		}
+		cli.Handle(c.serveMux)
+		c.cli = cli
+
 		opts := []mqtt.ConnectOption{
 			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
 			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
