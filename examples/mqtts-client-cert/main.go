@@ -59,15 +59,20 @@ func main() {
 			},
 		},
 		"sample", // Client ID
-		mqtt.WithKeepAlive(30),
-		mqtt.WithCleanSession(true),
-		mqtt.WithWill(
-			&mqtt.Message{
-				Topic:   "test",
-				QoS:     mqtt.QoS1,
-				Payload: []byte("{\"message\": \"Bye\"}"),
-			},
+		mqtt.WithConnectOption(
+			mqtt.WithKeepAlive(30),
+			mqtt.WithCleanSession(true),
+			mqtt.WithWill(
+				&mqtt.Message{
+					Topic:   "test",
+					QoS:     mqtt.QoS1,
+					Payload: []byte("{\"message\": \"Bye\"}"),
+				},
+			),
 		),
+		mqtt.WithPingInterval(10*time.Second),
+		mqtt.WithTimeout(5*time.Second),
+		mqtt.WithReconnectWait(1*time.Second, 15*time.Second),
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
