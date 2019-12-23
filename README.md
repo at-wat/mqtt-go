@@ -7,6 +7,12 @@
 Low layer, context-based synchronous
 
 
+## Examples
+
+- [MQTTs with client certificate](examples/mqtts-client-cert)
+- [WebSockets with presigned URL](examples/wss-presign-url)
+
+
 ## Reference
 - [MQTT Version 3.1.1 Plus Errata 01](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
 
