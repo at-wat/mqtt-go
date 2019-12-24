@@ -231,6 +231,7 @@ func (c *pahoWrapper) Publish(topic string, qos byte, retained bool, payload int
 		c.mu.Unlock()
 		if cli == nil {
 			token.err = ErrNotConnected
+			token.release()
 			return
 		}
 
@@ -255,6 +256,7 @@ func (c *pahoWrapper) Subscribe(topic string, qos byte, callback paho.MessageHan
 		c.mu.Unlock()
 		if cli == nil {
 			token.err = ErrNotConnected
+			token.release()
 			return
 		}
 
@@ -288,6 +290,7 @@ func (c *pahoWrapper) SubscribeMultiple(filters map[string]byte, callback paho.M
 		c.mu.Unlock()
 		if cli == nil {
 			token.err = ErrNotConnected
+			token.release()
 			return
 		}
 
@@ -305,6 +308,7 @@ func (c *pahoWrapper) Unsubscribe(topics ...string) paho.Token {
 		c.mu.Unlock()
 		if cli == nil {
 			token.err = ErrNotConnected
+			token.release()
 			return
 		}
 
