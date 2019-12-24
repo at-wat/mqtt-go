@@ -24,12 +24,6 @@ import (
 	"github.com/at-wat/mqtt-go"
 )
 
-type dialerFunc func() (mqtt.ClientCloser, error)
-
-func (d dialerFunc) Dial() (mqtt.ClientCloser, error) {
-	return d()
-}
-
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("usage: %s server-host.domain\n", os.Args[0])
@@ -44,7 +38,7 @@ func main() {
 
 	cli, err := mqtt.NewReconnectClient(ctx,
 		// Dialer to connect/reconnect to the server.
-		dialerFunc(func() (mqtt.ClientCloser, error) {
+		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
 			// Presign URL here.
 			url := fmt.Sprintf("wss://%s:9443?token=%x",
 				host, time.Now().UnixNano(),

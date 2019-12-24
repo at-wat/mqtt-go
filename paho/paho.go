@@ -50,87 +50,14 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 	return w
 }
 
-type token struct {
-	err  error
-	done chan struct{}
-}
-
-func newToken() *token {
-	return &token{
-		done: make(chan struct{}),
-	}
-}
-
-func (t *token) release() {
-	close(t.done)
-}
-
-func (t *token) Wait() bool {
-	<-t.done
-	return true
-}
-
-func (t *token) WaitTimeout(d time.Duration) bool {
-	select {
-	case <-t.done:
-		return true
-	case <-time.After(d):
-		return false
-	}
-}
-
-func (t *token) Error() error {
-	return t.err
-}
-
-type wrappedMessage struct {
-	*mqtt.Message
-}
-
-func (m *wrappedMessage) Duplicate() bool {
-	return m.Message.Dup
-}
-
-func (m *wrappedMessage) Qos() byte {
-	return byte(m.Message.QoS)
-}
-
-func (m *wrappedMessage) Retained() bool {
-	return m.Message.Retain
-}
-
-func (m *wrappedMessage) Topic() string {
-	return m.Message.Topic
-}
-
-func (m *wrappedMessage) MessageID() uint16 {
-	return m.Message.ID
-}
-
-func (m *wrappedMessage) Payload() []byte {
-	return m.Message.Payload
-}
-
-func (m *wrappedMessage) Ack() {
-}
-
-func wrapMessage(msg *mqtt.Message) paho.Message {
-	return &wrappedMessage{msg}
-}
-
-func (c *pahoWrapper) wrapMessageHandler(h paho.MessageHandler) mqtt.Handler {
-	return mqtt.HandlerFunc(func(m *mqtt.Message) {
-		h(c, wrapMessage(m))
-	})
-}
-
 func (c *pahoWrapper) IsConnected() bool {
 	select {
 	case <-c.cli.Done():
-	default:
-		if c.cli.Err() != nil {
+		if c.cli.Err() == nil {
 			return true
 		}
+	default:
+		return true
 	}
 	return false
 }
@@ -159,9 +86,13 @@ func (c *pahoWrapper) Connect() paho.Token {
 		cli.ConnState = func(s mqtt.ConnState, err error) {
 			switch s {
 			case mqtt.StateActive:
-				c.pahoConfig.OnConnect(c)
+				if c.pahoConfig.OnConnect != nil {
+					c.pahoConfig.OnConnect(c)
+				}
 			case mqtt.StateClosed:
-				c.pahoConfig.OnConnectionLost(c, err)
+				if c.pahoConfig.OnConnectionLost != nil {
+					c.pahoConfig.OnConnectionLost(c, err)
+				}
 			}
 		}
 		cli.Handle(c.serveMux)
@@ -173,7 +104,11 @@ func (c *pahoWrapper) Connect() paho.Token {
 			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
 			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
 			mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
-			mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
+		}
+		if c.pahoConfig.ProtocolVersion > 0 {
+			opts = append(opts,
+				mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
+			)
 		}
 		if c.pahoConfig.WillEnabled {
 			opts = append(opts, mqtt.WithWill(&mqtt.Message{
