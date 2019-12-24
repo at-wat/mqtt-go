@@ -35,7 +35,7 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 			}
 			opts.Servers = []*url.URL{server}
 			opts.AutoReconnect = recon
-			opts.ClientID = "PahoWrapper"
+			opts.ClientID = "PahoWrapper" + name
 			opts.KeepAlive = 0
 
 			cli := NewClient(opts)

@@ -17,7 +17,6 @@ package mqtt
 import (
 	"context"
 	"errors"
-	"io"
 )
 
 // ProtocolLevel represents MQTT protocol level.
@@ -52,19 +51,21 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 			return false, err
 		}
 	}
+	c.mu.Lock()
 	c.sig = &signaller{}
 	c.connClosed = make(chan struct{})
 	c.initID()
+	c.mu.Unlock()
 
 	go func() {
 		err := c.serve()
-		if err != io.EOF && err != io.ErrUnexpectedEOF {
-			if errConn := c.Close(); errConn != nil && err == nil {
-				err = errConn
-			}
+		if errConn := c.Close(); errConn != nil && err == nil {
+			err = errConn
 		}
 		c.mu.Lock()
-		c.err = err
+		if c.connState != StateDisconnected {
+			c.err = err
+		}
 		c.mu.Unlock()
 		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
