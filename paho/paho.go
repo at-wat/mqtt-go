@@ -85,9 +85,13 @@ func (c *pahoWrapper) Connect() paho.Token {
 		cli.ConnState = func(s mqtt.ConnState, err error) {
 			switch s {
 			case mqtt.StateActive:
-				c.pahoConfig.OnConnect(c)
+				if c.pahoConfig.OnConnect != nil {
+					c.pahoConfig.OnConnect(c)
+				}
 			case mqtt.StateClosed:
-				c.pahoConfig.OnConnectionLost(c, err)
+				if c.pahoConfig.OnConnectionLost != nil {
+					c.pahoConfig.OnConnectionLost(c, err)
+				}
 			}
 		}
 		cli.Handle(c.serveMux)
@@ -99,7 +103,11 @@ func (c *pahoWrapper) Connect() paho.Token {
 			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
 			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
 			mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
-			mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
+		}
+		if c.pahoConfig.ProtocolVersion > 0 {
+			opts = append(opts,
+				mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
+			)
 		}
 		if c.pahoConfig.WillEnabled {
 			opts = append(opts, mqtt.WithWill(&mqtt.Message{
