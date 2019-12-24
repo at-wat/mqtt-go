@@ -44,9 +44,6 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 	if len(o.Servers) != 1 {
 		panic("unsupported number of servers")
 	}
-	if o.AutoReconnect {
-		panic("paho style auto-reconnect is not supported")
-	}
 
 	return w
 }
@@ -125,12 +122,15 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 				cb.ConnState = func(s mqtt.ConnState, err error) {
 					switch s {
 					case mqtt.StateActive:
-						c.pahoConfig.OnConnect(c)
+						if c.pahoConfig.OnConnect != nil {
+							c.pahoConfig.OnConnect(c)
+						}
 					case mqtt.StateClosed:
-						c.pahoConfig.OnConnectionLost(c, err)
+						if c.pahoConfig.OnConnectionLost != nil {
+							c.pahoConfig.OnConnectionLost(c, err)
+						}
 					}
 				}
-				cb.Handle(c.serveMux)
 				c.mu.Lock()
 				c.cliCloser = cb
 				c.mu.Unlock()
@@ -150,6 +150,7 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 			token.release()
 			return
 		}
+		cli.Handle(c.serveMux)
 		c.mu.Lock()
 		c.cli = cli
 		c.mu.Unlock()
