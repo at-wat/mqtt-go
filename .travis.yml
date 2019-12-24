@@ -29,6 +29,10 @@ script:
       -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic
   - (cd paho; go vet ./...)
+  - |
+    (cd paho; go test $(go list ./...) \
+      -v \
+      -race -coverprofile=coverage.txt -covermode=atomic)
 
 after_script:
   - docker-compose down
