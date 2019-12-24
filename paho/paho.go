@@ -52,9 +52,15 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 }
 
 func (c *pahoWrapper) IsConnected() bool {
+	c.mu.Lock()
+	cli := c.cliCloser
+	c.mu.Unlock()
+	if cli == nil {
+		return false
+	}
 	select {
-	case <-c.cliCloser.Done():
-		if c.cliCloser.Err() == nil {
+	case <-cli.Done():
+		if cli.Err() == nil {
 			return true
 		}
 	default:
@@ -64,8 +70,14 @@ func (c *pahoWrapper) IsConnected() bool {
 }
 
 func (c *pahoWrapper) IsConnectionOpen() bool {
+	c.mu.Lock()
+	cli := c.cliCloser
+	c.mu.Unlock()
+	if cli == nil {
+		return false
+	}
 	select {
-	case <-c.cliCloser.Done():
+	case <-cli.Done():
 	default:
 		return true
 	}
@@ -119,6 +131,9 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 					}
 				}
 				cb.Handle(c.serveMux)
+				c.mu.Lock()
+				c.cliCloser = cb
+				c.mu.Unlock()
 				return cb, err
 			}),
 			c.pahoConfig.ClientID,
@@ -176,6 +191,7 @@ func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
 			cli.Handle(c.serveMux)
 			c.mu.Lock()
 			c.cli = cli
+			c.cliCloser = cli
 			c.mu.Unlock()
 
 			_, token.err = c.cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
