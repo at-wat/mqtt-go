@@ -27,7 +27,8 @@ import (
 var errNotConnected = errors.New("not connected")
 
 type pahoWrapper struct {
-	cli        mqtt.ClientCloser
+	cli        mqtt.Client
+	cliCloser  mqtt.Closer
 	serveMux   *mqtt.ServeMux
 	pahoConfig *paho.ClientOptions
 	mu         sync.Mutex
@@ -52,8 +53,8 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 
 func (c *pahoWrapper) IsConnected() bool {
 	select {
-	case <-c.cli.Done():
-		if c.cli.Err() == nil {
+	case <-c.cliCloser.Done():
+		if c.cliCloser.Err() == nil {
 			return true
 		}
 	default:
@@ -64,7 +65,7 @@ func (c *pahoWrapper) IsConnected() bool {
 
 func (c *pahoWrapper) IsConnectionOpen() bool {
 	select {
-	case <-c.cli.Done():
+	case <-c.cliCloser.Done():
 	default:
 		return true
 	}
@@ -72,70 +73,127 @@ func (c *pahoWrapper) IsConnectionOpen() bool {
 }
 
 func (c *pahoWrapper) Connect() paho.Token {
+	opts := []mqtt.ConnectOption{
+		mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
+		mqtt.WithCleanSession(c.pahoConfig.CleanSession),
+		mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
+	}
+	if c.pahoConfig.ProtocolVersion > 0 {
+		opts = append(opts,
+			mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
+		)
+	}
+	if c.pahoConfig.WillEnabled {
+		opts = append(opts, mqtt.WithWill(&mqtt.Message{
+			Topic:   c.pahoConfig.WillTopic,
+			Payload: c.pahoConfig.WillPayload,
+			QoS:     mqtt.QoS(c.pahoConfig.WillQos),
+			Retain:  c.pahoConfig.WillRetained,
+		}))
+	}
+	if c.pahoConfig.AutoReconnect {
+		return c.connectRetry(opts)
+	}
+	return c.connectOnce(opts)
+}
+
+func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 	token := newToken()
 	go func() {
-		cli, err := mqtt.Dial(
-			c.pahoConfig.Servers[0].String(),
-			mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
+		pingInterval := time.Duration(c.pahoConfig.KeepAlive) * time.Second
+
+		cli, err := mqtt.NewReconnectClient(context.Background(),
+			mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
+				cb, err := mqtt.Dial(c.pahoConfig.Servers[0].String(),
+					mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
+				)
+				if err != nil {
+					return nil, err
+				}
+				cb.ConnState = func(s mqtt.ConnState, err error) {
+					switch s {
+					case mqtt.StateActive:
+						c.pahoConfig.OnConnect(c)
+					case mqtt.StateClosed:
+						c.pahoConfig.OnConnectionLost(c, err)
+					}
+				}
+				cb.Handle(c.serveMux)
+				return cb, err
+			}),
+			c.pahoConfig.ClientID,
+			mqtt.WithConnectOption(opts...),
+			mqtt.WithPingInterval(pingInterval),
+			mqtt.WithTimeout(c.pahoConfig.PingTimeout),
+			mqtt.WithReconnectWait(
+				time.Second,    // c.pahoConfig.ConnectRetryInterval,
+				10*time.Second, // c.pahoConfig.MaxReconnectInterval,
+			),
 		)
 		if err != nil {
 			token.err = err
 			token.release()
 			return
 		}
-		cli.ConnState = func(s mqtt.ConnState, err error) {
-			switch s {
-			case mqtt.StateActive:
-				if c.pahoConfig.OnConnect != nil {
-					c.pahoConfig.OnConnect(c)
-				}
-			case mqtt.StateClosed:
-				if c.pahoConfig.OnConnectionLost != nil {
-					c.pahoConfig.OnConnectionLost(c, err)
-				}
-			}
-		}
-		cli.Handle(c.serveMux)
 		c.mu.Lock()
 		c.cli = cli
 		c.mu.Unlock()
 
-		opts := []mqtt.ConnectOption{
-			mqtt.WithUserNamePassword(c.pahoConfig.Username, c.pahoConfig.Password),
-			mqtt.WithCleanSession(c.pahoConfig.CleanSession),
-			mqtt.WithKeepAlive(uint16(c.pahoConfig.KeepAlive)),
-		}
-		if c.pahoConfig.ProtocolVersion > 0 {
-			opts = append(opts,
-				mqtt.WithProtocolLevel(mqtt.ProtocolLevel(c.pahoConfig.ProtocolVersion)),
-			)
-		}
-		if c.pahoConfig.WillEnabled {
-			opts = append(opts, mqtt.WithWill(&mqtt.Message{
-				Topic:   c.pahoConfig.WillTopic,
-				Payload: c.pahoConfig.WillPayload,
-				QoS:     mqtt.QoS(c.pahoConfig.WillQos),
-				Retain:  c.pahoConfig.WillRetained,
-			}))
-		}
-		_, token.err = c.cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
-		if token.err == nil {
-			if c.pahoConfig.KeepAlive > 0 {
-				// Start keep alive.
-				go func() {
-					timeout := c.pahoConfig.PingTimeout
-					if timeout < time.Second {
-						timeout = time.Second
-					}
-					_ = mqtt.KeepAlive(
-						context.Background(), cli,
-						time.Duration(c.pahoConfig.KeepAlive)*time.Second,
-						timeout,
-					)
-				}()
-			}
-		}
 		token.release()
+	}()
+	return token
+}
+
+func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
+	token := newToken()
+	go func() {
+		for { // Connect retry loop
+			cli, err := mqtt.Dial(
+				c.pahoConfig.Servers[0].String(),
+				mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
+			)
+			if err != nil {
+				// if c.pahoConfig.ConnectRetry {
+				//   time.Sleep(c.pahoConfig.ConnectRetryInterval)
+				//   continue
+				// }
+				token.err = err
+				token.release()
+				return
+			}
+			cli.ConnState = func(s mqtt.ConnState, err error) {
+				switch s {
+				case mqtt.StateActive:
+					if c.pahoConfig.OnConnect != nil {
+						c.pahoConfig.OnConnect(c)
+					}
+				case mqtt.StateClosed:
+					if c.pahoConfig.OnConnectionLost != nil {
+						c.pahoConfig.OnConnectionLost(c, err)
+					}
+				}
+			}
+			cli.Handle(c.serveMux)
+			c.mu.Lock()
+			c.cli = cli
+			c.mu.Unlock()
+
+			_, token.err = c.cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
+			if token.err == nil {
+				if c.pahoConfig.KeepAlive > 0 {
+					// Start keep alive.
+					go func() {
+						_ = mqtt.KeepAlive(
+							context.Background(), cli,
+							time.Duration(c.pahoConfig.KeepAlive)*time.Second,
+							c.pahoConfig.PingTimeout,
+						)
+					}()
+				}
+			}
+			token.release()
+			return
+		}
 	}()
 	return token
 }
