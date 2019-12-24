@@ -57,9 +57,6 @@ func (c *pahoWrapper) IsConnected() bool {
 	}
 	select {
 	case <-cli.Done():
-		if cli.Err() == nil {
-			return true
-		}
 	default:
 		return true
 	}
@@ -67,18 +64,7 @@ func (c *pahoWrapper) IsConnected() bool {
 }
 
 func (c *pahoWrapper) IsConnectionOpen() bool {
-	c.mu.Lock()
-	cli := c.cliCloser
-	c.mu.Unlock()
-	if cli == nil {
-		return false
-	}
-	select {
-	case <-cli.Done():
-	default:
-		return true
-	}
-	return false
+	return c.IsConnected()
 }
 
 func (c *pahoWrapper) Connect() paho.Token {
