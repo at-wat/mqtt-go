@@ -20,11 +20,7 @@ import (
 
 // Disconnect from the broker.
 func (c *BaseClient) Disconnect(ctx context.Context) error {
-	pkt := pack(
-		packetDisconnect.b(),
-		[]byte{},
-		[]byte{},
-	)
+	pkt := pack(packetDisconnect.b())
 	c.connStateUpdate(StateDisconnected)
 	if err := c.write(pkt); err != nil {
 		return err

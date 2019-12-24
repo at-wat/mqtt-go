@@ -18,18 +18,27 @@ import (
 	"context"
 )
 
-// Unsubscribe topics.
-func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
-	pktHeader := byte(packetUnsubscribe | packetFromClient)
+type pktUnsubscribe struct {
+	ID     uint16
+	Topics []string
+}
 
-	id := c.newID()
-	header := packUint16(id)
-
+func (p *pktUnsubscribe) pack() []byte {
 	var payload []byte
-	for _, sub := range subs {
+	for _, sub := range p.Topics {
 		payload = append(payload, packString(sub)...)
 	}
-	pkt := pack(pktHeader, header, payload)
+
+	return pack(
+		byte(packetUnsubscribe|packetFromClient),
+		packUint16(p.ID),
+		payload,
+	)
+}
+
+// Unsubscribe topics.
+func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
+	id := c.newID()
 
 	chUnsubAck := make(chan *pktUnsubAck, 1)
 	c.sig.mu.Lock()
@@ -39,6 +48,7 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	c.sig.chUnsubAck[id] = chUnsubAck
 	c.sig.mu.Unlock()
 
+	pkt := (&pktUnsubscribe{ID: id, Topics: subs}).pack()
 	if err := c.write(pkt); err != nil {
 		return err
 	}

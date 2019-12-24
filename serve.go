@@ -67,7 +67,7 @@ func (c *BaseClient) serve() error {
 				handler := c.handler
 				c.mu.RUnlock()
 				if handler != nil {
-					handler.Serve(&publish.Message)
+					handler.Serve(publish.Message)
 				}
 			case QoS1:
 				// Ownership of the message is now transferred to the receiver.
@@ -75,24 +75,18 @@ func (c *BaseClient) serve() error {
 				handler := c.handler
 				c.mu.RUnlock()
 				if handler != nil {
-					handler.Serve(&publish.Message)
+					handler.Serve(publish.Message)
 				}
-				pktPubAck := pack(
-					packetPubAck.b()|packetFromClient.b(),
-					packUint16(publish.Message.ID),
-				)
+				pktPubAck := (&pktPubAck{ID: publish.Message.ID}).pack()
 				if err := c.write(pktPubAck); err != nil {
 					return err
 				}
 			case QoS2:
-				pktPubRec := pack(
-					packetPubRec.b()|packetFromClient.b(),
-					packUint16(publish.Message.ID),
-				)
+				pktPubRec := (&pktPubRec{ID: publish.Message.ID}).pack()
 				if err := c.write(pktPubRec); err != nil {
 					return err
 				}
-				subBuffer[publish.Message.ID] = &publish.Message
+				subBuffer[publish.Message.ID] = publish.Message
 			}
 		case packetPubAck:
 			pubAck, err := (&pktPubAck{}).parse(pktFlag, contents)
@@ -132,10 +126,7 @@ func (c *BaseClient) serve() error {
 				delete(subBuffer, pubRel.ID)
 			}
 
-			pktPubComp := pack(
-				packetPubComp.b()|packetFromClient.b(),
-				packUint16(pubRel.ID),
-			)
+			pktPubComp := (&pktPubComp{ID: pubRel.ID}).pack()
 			if err := c.write(pktPubComp); err != nil {
 				return err
 			}

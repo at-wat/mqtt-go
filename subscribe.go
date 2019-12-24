@@ -30,15 +30,14 @@ const (
 	subscribeFlagQoS2 subscribeFlag = 0x02
 )
 
-// Subscribe topics.
-func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	pktHeader := byte(packetSubscribe | packetFromClient)
+type pktSubscribe struct {
+	ID            uint16
+	Subscriptions []Subscription
+}
 
-	id := c.newID()
-	header := packUint16(id)
-
+func (p *pktSubscribe) pack() []byte {
 	var payload []byte
-	for _, sub := range subs {
+	for _, sub := range p.Subscriptions {
 		payload = append(payload, packString(sub.Topic)...)
 
 		var flag byte
@@ -54,7 +53,16 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 		}
 		payload = append(payload, flag)
 	}
-	pkt := pack(pktHeader, header, payload)
+	return pack(
+		byte(packetSubscribe|packetFromClient),
+		packUint16(p.ID),
+		payload,
+	)
+}
+
+// Subscribe topics.
+func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error {
+	id := c.newID()
 
 	chSubAck := make(chan *pktSubAck, 1)
 	c.sig.mu.Lock()
@@ -64,6 +72,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 	c.sig.chSubAck[id] = chSubAck
 	c.sig.mu.Unlock()
 
+	pkt := (&pktSubscribe{ID: id, Subscriptions: subs}).pack()
 	if err := c.write(pkt); err != nil {
 		return err
 	}

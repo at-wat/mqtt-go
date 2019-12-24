@@ -28,3 +28,10 @@ func (p *pktPubRel) parse(flag byte, contents []byte) (*pktPubRel, error) {
 	_, p.ID = unpackUint16(contents)
 	return p, nil
 }
+
+func (p *pktPubRel) pack() []byte {
+	return pack(
+		packetPubRel.b()|packetFromClient.b(),
+		packUint16(p.ID),
+	)
+}
