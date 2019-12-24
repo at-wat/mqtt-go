@@ -146,7 +146,12 @@ func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
 	if err != nil {
 		return nil, err
 	}
-	nID, p.Message.ID = unpackUint16(contents[n:])
+	if p.Message.QoS != QoS0 {
+		if len(contents)-n < 2 {
+			return nil, ErrInvalidPacketLength
+		}
+		nID, p.Message.ID = unpackUint16(contents[n:])
+	}
 	p.Message.Payload = contents[n+nID:]
 
 	return p, nil
