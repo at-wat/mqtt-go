@@ -32,6 +32,7 @@ script:
   - |
     (cd paho; go test $(go list ./...) \
       -v \
+      -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic)
 
 after_script:
