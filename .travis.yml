@@ -13,6 +13,10 @@ env:
   global:
     - GO111MODULE=on
 
+before_install:
+  - ! grep require paho/go.mod
+  - ! grep replace paho/go.mod  # don't add require/replace to paho/go.mod
+
 install:
   - go mod download
   - go build ./...
@@ -22,8 +26,6 @@ before_script:
   - echo 'replace github.com/at-wat/mqtt-go => ../' >> paho/go.mod
 
 script:
-  - ! grep require paho/go.mod
-  - ! grep replace paho/go.mod  # don't add require/replace to paho/go.mod
   - go vet -tags integration ./...
   - |
     go test $(go list ./... | grep -v examples) \
