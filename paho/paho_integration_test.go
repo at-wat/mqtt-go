@@ -48,7 +48,7 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 	if !token.WaitTimeout(5 * time.Second) {
 		t.Fatal("Subscribe timeout")
 	}
-	token = cli.Publish("paho", 1, false, []byte{0x12, 0, 0})
+	token = cli.Publish("paho", 1, false, []byte{0x12})
 	if !token.WaitTimeout(5 * time.Second) {
 		t.Fatal("Publish timeout")
 	}
@@ -72,6 +72,7 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 		t.Fatal("Message timeout")
 	}
 	cli.Disconnect(10)
+	time.Sleep(time.Second)
 
 	if cli.IsConnected() {
 		t.Error("Connected after disconnect")
