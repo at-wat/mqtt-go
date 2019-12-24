@@ -137,3 +137,41 @@ func TestConnect_OptionsError(t *testing.T) {
 		t.Errorf("SessionPresent flag must not be set on options error")
 	}
 }
+
+func TestConnect_Error(t *testing.T) {
+	ca, cb := net.Pipe()
+	cli := &BaseClient{Transport: cb}
+
+	go func() {
+		if _, err := ca.Read(make([]byte, 100)); err != nil {
+			t.Fatalf("Unexpected error: '%v'", err)
+		}
+
+		// Send CONNACK.
+		if _, err := ca.Write([]byte{
+			0x20, 0x02, 0x00, 0x04,
+		}); err != nil {
+			t.Fatalf("Unexpected error: '%v'", err)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := cli.Connect(ctx, "cli")
+	if err == nil {
+		t.Fatal("Error is not returned on connection refuse")
+	}
+
+	conErr, ok := err.(*ConnectionError)
+	if !ok {
+		t.Fatal("Returned error type is not ConnectionError")
+	}
+	if conErr.Unwrap() != ErrConnectionFailed {
+		t.Errorf("Connection error must be unwrapped to: '%v', got: '%v'",
+			ErrConnectionFailed, conErr.Unwrap(),
+		)
+	}
+	if conErr.Code != BadUserNameOrPassword {
+		t.Errorf("Server returned: '%v', parsed as: '%v'", BadUserNameOrPassword, conErr.Code)
+	}
+}

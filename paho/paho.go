@@ -24,7 +24,8 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-var errNotConnected = errors.New("not connected")
+// ErrNotConnected means that the command was requested on the closed connection.
+var ErrNotConnected = errors.New("not connected")
 
 type pahoWrapper struct {
 	cli        mqtt.Client
@@ -229,7 +230,7 @@ func (c *pahoWrapper) Publish(topic string, qos byte, retained bool, payload int
 		cli := c.cli
 		c.mu.Unlock()
 		if cli == nil {
-			token.err = errNotConnected
+			token.err = ErrNotConnected
 			return
 		}
 
@@ -253,7 +254,7 @@ func (c *pahoWrapper) Subscribe(topic string, qos byte, callback paho.MessageHan
 		cli := c.cli
 		c.mu.Unlock()
 		if cli == nil {
-			token.err = errNotConnected
+			token.err = ErrNotConnected
 			return
 		}
 
@@ -286,7 +287,7 @@ func (c *pahoWrapper) SubscribeMultiple(filters map[string]byte, callback paho.M
 		cli := c.cli
 		c.mu.Unlock()
 		if cli == nil {
-			token.err = errNotConnected
+			token.err = ErrNotConnected
 			return
 		}
 
@@ -303,7 +304,7 @@ func (c *pahoWrapper) Unsubscribe(topics ...string) paho.Token {
 		cli := c.cli
 		c.mu.Unlock()
 		if cli == nil {
-			token.err = errNotConnected
+			token.err = ErrNotConnected
 			return
 		}
 

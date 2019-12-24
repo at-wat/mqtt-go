@@ -147,11 +147,32 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		return false, ctx.Err()
 	case connAck := <-chConnAck:
 		if connAck.Code != ConnectionAccepted {
-			return false, errors.New(connAck.Code.String())
+			return false, &ConnectionError{
+				Err:  ErrConnectionFailed,
+				Code: connAck.Code,
+			}
 		}
 		c.connStateUpdate(StateActive)
 		return connAck.SessionPresent, nil
 	}
+}
+
+// ErrConnectionFailed means the connection is not established.
+var ErrConnectionFailed = errors.New("connection failed")
+
+// ConnectionError ia a error storing connection return code.
+type ConnectionError struct {
+	Err  error
+	Code ConnectionReturnCode
+}
+
+func (e *ConnectionError) Error() string {
+	return e.Code.String() + ": " + e.Err.Error()
+}
+
+// Unwrap returns base error of ConnectionError. (for Go1.13 error unwrapping.)
+func (e *ConnectionError) Unwrap() error {
+	return e.Err
 }
 
 // ConnectOptions represents options for Connect.
