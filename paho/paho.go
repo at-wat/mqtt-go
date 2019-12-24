@@ -53,10 +53,11 @@ func NewClient(o *paho.ClientOptions) paho.Client {
 func (c *pahoWrapper) IsConnected() bool {
 	select {
 	case <-c.cli.Done():
-	default:
-		if c.cli.Err() != nil {
+		if c.cli.Err() == nil {
 			return true
 		}
+	default:
+		return true
 	}
 	return false
 }
