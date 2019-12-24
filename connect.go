@@ -41,6 +41,59 @@ const (
 	connectFlagUserName     connectFlag = 0x80
 )
 
+type pktConnect struct {
+	ProtocolLevel ProtocolLevel
+	CleanSession  bool
+	KeepAlive     uint16
+	ClientID      string
+	UserName      string
+	Password      string
+	Will          *Message
+}
+
+func (p *pktConnect) pack() []byte {
+	payload := packString(p.ClientID)
+
+	var flag byte
+	if p.CleanSession {
+		flag |= byte(connectFlagCleanSession)
+	}
+	if p.Will != nil {
+		flag |= byte(connectFlagWill)
+		switch p.Will.QoS {
+		case QoS0:
+			flag |= byte(connectFlagWillQoS0)
+		case QoS1:
+			flag |= byte(connectFlagWillQoS1)
+		case QoS2:
+			flag |= byte(connectFlagWillQoS2)
+		}
+		if p.Will.Retain {
+			flag |= byte(connectFlagWillRetain)
+		}
+		payload = append(payload, packString(p.Will.Topic)...)
+		payload = append(payload, packBytes(p.Will.Payload)...)
+	}
+	if p.UserName != "" {
+		flag |= byte(connectFlagUserName)
+		payload = append(payload, packString(p.UserName)...)
+	}
+	if p.Password != "" {
+		flag |= byte(connectFlagPassword)
+		payload = append(payload, packString(p.Password)...)
+	}
+	return pack(
+		packetConnect.b(),
+		[]byte{
+			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
+			byte(p.ProtocolLevel),
+			flag,
+		},
+		packUint16(p.KeepAlive),
+		payload,
+	)
+}
+
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
 	o := &ConnectOptions{
@@ -51,11 +104,9 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 			return false, err
 		}
 	}
-	c.mu.Lock()
 	c.sig = &signaller{}
 	c.connClosed = make(chan struct{})
 	c.initID()
-	c.mu.Unlock()
 
 	go func() {
 		err := c.serve()
@@ -70,53 +121,22 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		c.connStateUpdate(StateClosed)
 		close(c.connClosed)
 	}()
-	payload := packString(clientID)
-
-	var flag byte
-	if o.CleanSession {
-		flag |= byte(connectFlagCleanSession)
-	}
-	if o.Will != nil {
-		flag |= byte(connectFlagWill)
-		switch o.Will.QoS {
-		case QoS0:
-			flag |= byte(connectFlagWillQoS0)
-		case QoS1:
-			flag |= byte(connectFlagWillQoS1)
-		case QoS2:
-			flag |= byte(connectFlagWillQoS2)
-		default:
-			panic("invalid QoS")
-		}
-		if o.Will.Retain {
-			flag |= byte(connectFlagWillRetain)
-		}
-		payload = append(payload, packString(o.Will.Topic)...)
-		payload = append(payload, packBytes(o.Will.Payload)...)
-	}
-	if o.UserName != "" {
-		flag |= byte(connectFlagUserName)
-		payload = append(payload, packString(o.UserName)...)
-	}
-	if o.Password != "" {
-		flag |= byte(connectFlagPassword)
-		payload = append(payload, packString(o.Password)...)
-	}
-	pkt := pack(
-		packetConnect.b(),
-		[]byte{
-			0x00, 0x04, 0x4D, 0x51, 0x54, 0x54,
-			byte(o.ProtocolLevel),
-			flag,
-		},
-		packUint16(o.KeepAlive),
-		payload,
-	)
 
 	chConnAck := make(chan *pktConnAck, 1)
 	c.mu.Lock()
 	c.sig.chConnAck = chConnAck
 	c.mu.Unlock()
+
+	pkt := (&pktConnect{
+		ProtocolLevel: o.ProtocolLevel,
+		CleanSession:  o.CleanSession,
+		KeepAlive:     o.KeepAlive,
+		ClientID:      clientID,
+		UserName:      o.UserName,
+		Password:      o.Password,
+		Will:          o.Will,
+	}).pack()
+
 	if err := c.write(pkt); err != nil {
 		return false, err
 	}
@@ -175,6 +195,11 @@ func WithCleanSession(cleanSession bool) ConnectOption {
 // WithWill sets will message.
 func WithWill(will *Message) ConnectOption {
 	return func(o *ConnectOptions) error {
+		switch will.QoS {
+		case QoS0, QoS1, QoS2:
+		default:
+			return ErrInvalidPacket
+		}
 		o.Will = will
 		return nil
 	}

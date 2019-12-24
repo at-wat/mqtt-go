@@ -29,16 +29,50 @@ const (
 	publishFlagDup     publishFlag = 0x08
 )
 
-// Publish a message to the broker.
-// ID field of the message is filled if zero.
-func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
-	pktHeader := packetPublish.b()
-	header := packString(message.Topic)
+type pktPublish struct {
+	Message *Message
+}
 
-	if message.Retain {
+func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
+	p.Message = &Message{
+		Dup:    (publishFlag(flag) & publishFlagDup) != 0,
+		Retain: (publishFlag(flag) & publishFlagRetain) != 0,
+	}
+	switch publishFlag(flag) & publishFlagQoSMask {
+	case publishFlagQoS0:
+		p.Message.QoS = QoS0
+	case publishFlagQoS1:
+		p.Message.QoS = QoS1
+	case publishFlagQoS2:
+		p.Message.QoS = QoS2
+	default:
+		return nil, ErrInvalidPacket
+	}
+
+	var n, nID int
+	var err error
+	n, p.Message.Topic, err = unpackString(contents)
+	if err != nil {
+		return nil, err
+	}
+	if p.Message.QoS != QoS0 {
+		if len(contents)-n < 2 {
+			return nil, ErrInvalidPacketLength
+		}
+		nID, p.Message.ID = unpackUint16(contents[n:])
+	}
+	p.Message.Payload = contents[n+nID:]
+
+	return p, nil
+}
+
+func (p *pktPublish) pack() []byte {
+	pktHeader := packetPublish.b()
+
+	if p.Message.Retain {
 		pktHeader |= byte(publishFlagRetain)
 	}
-	switch message.QoS {
+	switch p.Message.QoS {
 	case QoS0:
 		pktHeader |= byte(publishFlagQoS0)
 	case QoS1:
@@ -48,17 +82,28 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	default:
 		panic("invalid QoS")
 	}
-	if message.Dup {
+	if p.Message.Dup {
 		pktHeader |= byte(publishFlagDup)
 	}
+
+	header := packString(p.Message.Topic)
+	if p.Message.QoS != QoS0 {
+		header = append(header, packUint16(p.Message.ID)...)
+	}
+
+	return pack(
+		pktHeader,
+		header,
+		p.Message.Payload,
+	)
+}
+
+// Publish a message to the broker.
+// ID field of the message is filled if zero.
+func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	if message.ID == 0 {
 		message.ID = c.newID()
 	}
-
-	if message.QoS != QoS0 {
-		header = append(header, packUint16(message.ID)...)
-	}
-	pkt := pack(pktHeader, header, message.Payload)
 
 	var chPubAck chan *pktPubAck
 	var chPubRec chan *pktPubRec
@@ -87,6 +132,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		c.sig.mu.Unlock()
 	}
 
+	pkt := (&pktPublish{Message: message}).pack()
 	if err := c.write(pkt); err != nil {
 		return err
 	}
@@ -107,7 +153,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 			return ctx.Err()
 		case <-chPubRec:
 		}
-		pktPubRel := pack(packetPubRel.b()|packetFromClient.b(), packUint16(message.ID))
+		pktPubRel := (&pktPubRel{ID: message.ID}).pack()
 		if err := c.write(pktPubRel); err != nil {
 			return err
 		}
@@ -120,39 +166,4 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		}
 	}
 	return nil
-}
-
-type pktPublish struct {
-	Message
-}
-
-func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
-	p.Message.Dup = (publishFlag(flag) & publishFlagDup) != 0
-	p.Message.Retain = (publishFlag(flag) & publishFlagRetain) != 0
-	switch publishFlag(flag) & publishFlagQoSMask {
-	case publishFlagQoS0:
-		p.Message.QoS = QoS0
-	case publishFlagQoS1:
-		p.Message.QoS = QoS1
-	case publishFlagQoS2:
-		p.Message.QoS = QoS2
-	default:
-		return nil, ErrInvalidPacket
-	}
-
-	var n, nID int
-	var err error
-	n, p.Message.Topic, err = unpackString(contents)
-	if err != nil {
-		return nil, err
-	}
-	if p.Message.QoS != QoS0 {
-		if len(contents)-n < 2 {
-			return nil, ErrInvalidPacketLength
-		}
-		nID, p.Message.ID = unpackUint16(contents[n:])
-	}
-	p.Message.Payload = contents[n+nID:]
-
-	return p, nil
 }

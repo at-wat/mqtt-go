@@ -20,13 +20,12 @@ import (
 
 // Ping to the broker.
 func (c *BaseClient) Ping(ctx context.Context) error {
-	pkt := pack(packetPingReq.b())
-
 	chPingResp := make(chan *pktPingResp, 1)
 	c.mu.Lock()
 	c.sig.chPingResp = chPingResp
 	c.mu.Unlock()
 
+	pkt := pack(packetPingReq.b())
 	if err := c.write(pkt); err != nil {
 		return err
 	}
