@@ -41,6 +41,14 @@ type Dialer interface {
 	Dial() (ClientCloser, error)
 }
 
+// DialerFunc type is an adapter to use functions as MQTT connection dialer.
+type DialerFunc func() (ClientCloser, error)
+
+// Dial calls d().
+func (d DialerFunc) Dial() (ClientCloser, error) {
+	return d()
+}
+
 // Dial creates connection using its values.
 func (d *URLDialer) Dial() (ClientCloser, error) {
 	return Dial(d.URL, d.Options...)
