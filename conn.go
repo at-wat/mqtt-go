@@ -154,6 +154,8 @@ func (c *BaseClient) Close() error {
 
 // Done is a channel to signal connection close.
 func (c *BaseClient) Done() <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.connClosed
 }
 

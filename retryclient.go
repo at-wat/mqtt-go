@@ -100,6 +100,30 @@ func (c *RetryClient) subscribe(ctx context.Context, cli Client, subs ...Subscri
 	}
 }
 
+// Disconnect from the broker.
+func (c *RetryClient) Disconnect(ctx context.Context) error {
+	c.mu.Lock()
+	cli := c.Client
+	c.mu.Unlock()
+	return cli.Disconnect(ctx)
+}
+
+// Unsubscribe topics.
+func (c *RetryClient) Unsubscribe(ctx context.Context, subs ...string) error {
+	c.mu.Lock()
+	cli := c.Client
+	c.mu.Unlock()
+	return cli.Unsubscribe(ctx, subs...)
+}
+
+// Ping to the broker.
+func (c *RetryClient) Ping(ctx context.Context) error {
+	c.mu.Lock()
+	cli := c.Client
+	c.mu.Unlock()
+	return cli.Ping(ctx)
+}
+
 // SetClient sets the new Client.
 // If there are any queued messages, retry to publish them.
 func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
