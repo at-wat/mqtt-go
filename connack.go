@@ -34,19 +34,19 @@ const (
 func (c ConnectionReturnCode) String() string {
 	switch c {
 	case ConnectionAccepted:
-		return "ConnectionAccepted"
+		return "connection accepted"
 	case UnacceptableProtocolVersion:
-		return "Connection Refused, unacceptable protocol version"
+		return "connection refused, unacceptable protocol version"
 	case IdentifierRejected:
-		return "Connection Refused, identifier rejected"
+		return "connection refused, identifier rejected"
 	case ServerUnavailable:
-		return "Connection Refused, Server unavailable"
+		return "connection refused, Server unavailable"
 	case BadUserNameOrPassword:
-		return "Connection Refused, bad user name or password"
+		return "connection refused, bad user name or password"
 	case NotAuthorized:
-		return "Connection Refused, not authorized"
+		return "connection refused, not authorized"
 	}
-	return fmt.Sprintf("Unknown ConnectionReturnCode %x", int(c))
+	return fmt.Sprintf("unknown ConnectionReturnCode %x", int(c))
 }
 
 type pktConnAck struct {
