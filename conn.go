@@ -113,8 +113,7 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 		}
 		c.Transport = conn
 	case "ws", "wss":
-		wsc, err := websocket.NewConfig(
-			fmt.Sprintf("%s://%s:%s%s", u.Scheme, u.Hostname(), u.Port(), u.EscapedPath()), "ws://")
+		wsc, err := websocket.NewConfig(u.String(), fmt.Sprintf("https://%s", u.Host))
 		if err != nil {
 			return nil, err
 		}
@@ -125,6 +124,7 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 		if err != nil {
 			return nil, err
 		}
+		ws.PayloadType = websocket.BinaryFrame
 		c.Transport = ws
 	default:
 		return nil, ErrUnsupportedProtocol
