@@ -22,6 +22,9 @@ func (p *pktPubRel) parse(flag byte, contents []byte) (*pktPubRel, error) {
 	if flag != 0x02 {
 		return nil, ErrInvalidPacket
 	}
+	if len(contents) < 2 {
+		return nil, ErrInvalidPacketLength
+	}
 	_, p.ID = unpackUint16(contents)
 	return p, nil
 }
