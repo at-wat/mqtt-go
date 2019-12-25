@@ -1,0 +1,20 @@
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  tag-subpackges:
+    name: push subpackage tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: push tags
+        run: |
+          git remote set-url origin https://${GITHUB_TOKEN}@github.com/at-wat/mqtt-go.git
+          git tag paho/$(basename ${TAG})
+          git push origin paho/$(basename ${TAG})
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref }}
