@@ -87,22 +87,20 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 
 func newCloseFilter(key byte, en bool) func([]byte) bool {
 	var readBuf []byte
-	return func(b []byte) bool {
-		if !en {
-			return false
-		}
+	return func(b []byte) (ret bool) {
 		readBuf = append(readBuf, b...)
+		ret = false
 		for {
 			if len(readBuf) == 0 {
-				return false
+				return
 			}
 			if readBuf[0]&0xF0 == key {
-				return true
+				ret = en
 			}
 			var length int
 			for i := 1; i < 6; i++ {
 				if i >= len(readBuf) {
-					return false
+					return
 				}
 				length = (length << 7) | (int(readBuf[i]) & 0x7F)
 				if !(readBuf[i]&0x80 != 0) {
@@ -111,7 +109,7 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 				}
 			}
 			if length >= len(readBuf) {
-				return false
+				return
 			}
 			readBuf = readBuf[length:]
 		}
@@ -135,7 +133,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 			for pktName, head := range cases {
 				fIn, fOut := head.in, head.out
 				t.Run("StopAt"+pktName, func(t *testing.T) {
-					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 					var dialCnt int32
 
@@ -170,17 +168,17 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						chReceived <- msg
 					}))
 
-					if err := cli.Subscribe(ctx, Subscription{
-						Topic: "test/" + name,
-						QoS:   QoS1,
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
 					if err := cli.Publish(ctx, &Message{
 						Topic:   "test/" + name,
 						QoS:     QoS1,
 						Retain:  true,
 						Payload: []byte("message"),
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if err := cli.Subscribe(ctx, Subscription{
+						Topic: "test/" + name,
+						QoS:   QoS1,
 					}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
