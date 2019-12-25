@@ -34,14 +34,14 @@ type conn struct {
 }
 
 func (c *conn) Read(data []byte) (n int, err error) {
-	select {
-	case <-c.closed:
-		return 0, io.EOF
-	default:
-	}
 	if c.remain != nil {
 		n, _ := c.remain.Read(data)
 		if n == 0 {
+			select {
+			case <-c.closed:
+				return 0, io.EOF
+			default:
+			}
 			c.remain = nil
 			return c.Read(data)
 		}
@@ -75,8 +75,7 @@ func (c *conn) Write(data []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	default:
 	}
-	cp := make([]byte, len(data))
-	copy(cp, data[:len(data)])
+	cp := append([]byte{}, data...)
 	select {
 	case <-c.closed:
 		return 0, io.ErrClosedPipe

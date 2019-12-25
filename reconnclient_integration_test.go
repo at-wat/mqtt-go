@@ -98,12 +98,12 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 				ret = en
 			}
 			var length int
-			for i := 1; i < 6; i++ {
+			for i := 1; i < 5; i++ {
 				if i >= len(readBuf) {
 					return
 				}
 				length = (length << 7) | (int(readBuf[i]) & 0x7F)
-				if !(readBuf[i]&0x80 != 0) {
+				if readBuf[i]&0x80 == 0 {
 					length += i + 1
 					break
 				}
@@ -133,6 +133,14 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 			for pktName, head := range cases {
 				fIn, fOut := head.in, head.out
 				t.Run("StopAt"+pktName, func(t *testing.T) {
+					if pktName == "PublishOut" && name == "WebSockets" {
+						// Mosquitto doesn't publish the first retained message on
+						// reconnecting wss if the previous connection was aborted
+						// before PUBLISH packet.
+						// Other protocols work as expected.
+						t.SkipNow()
+					}
+
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 					var dialCnt int32
@@ -141,13 +149,13 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 					cli, err := NewReconnectClient(
 						ctx,
 						DialerFunc(func() (ClientCloser, error) {
-							cnt := atomic.AddInt32(&dialCnt, 1)
 							cli, err := Dial(url,
 								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 							)
 							if err != nil {
 								return nil, err
 							}
+							cnt := atomic.AddInt32(&dialCnt, 1)
 							ca, cb := filteredpipe.DetectAndClosePipe(
 								newCloseFilter(fIn, cnt == 1),
 								newCloseFilter(fOut, cnt == 1),
@@ -169,7 +177,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 					}))
 
 					if err := cli.Publish(ctx, &Message{
-						Topic:   "test/" + name,
+						Topic:   "test/" + name + pktName,
 						QoS:     QoS1,
 						Retain:  true,
 						Payload: []byte("message"),
@@ -177,7 +185,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 					if err := cli.Subscribe(ctx, Subscription{
-						Topic: "test/" + name,
+						Topic: "test/" + name + pktName,
 						QoS:   QoS1,
 					}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)

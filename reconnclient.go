@@ -63,11 +63,9 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 				ctxTimeout, cancel := context.WithTimeout(ctx, options.Timeout)
 				if present, err := rc.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
 					cancel()
-					reconnWait = options.ReconnectWaitBase // Reset reconnect wait.
 					if !present {
 						rc.Resubscribe(ctx)
 					}
-					doneOnce.Do(func() { close(done) })
 					if options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
@@ -78,6 +76,8 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 							)
 						}()
 					}
+					reconnWait = options.ReconnectWaitBase // Reset reconnect wait.
+					doneOnce.Do(func() { close(done) })
 					select {
 					case <-c.Done():
 						if err := c.Err(); err == nil {
