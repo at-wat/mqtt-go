@@ -63,9 +63,12 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 				ctxTimeout, cancel := context.WithTimeout(ctx, options.Timeout)
 				if present, err := rc.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
 					cancel()
+
 					if !present {
 						rc.Resubscribe(ctx)
 					}
+					rc.Retry(ctx)
+
 					if options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
