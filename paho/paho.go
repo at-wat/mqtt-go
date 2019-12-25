@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package mqtt is a paho.mqtt.golang interface wrapper over at-wat/mqtt-go.
 package mqtt
 
 import (
