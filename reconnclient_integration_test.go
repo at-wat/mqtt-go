@@ -193,8 +193,8 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 					}
 
 					cnt := atomic.LoadInt32(&dialCnt)
-					if cnt != 2 {
-						t.Errorf("Must be dialled twice, dialled %d times", cnt)
+					if cnt < 2 {
+						t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
 					}
 				})
 			}
