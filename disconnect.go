@@ -20,6 +20,9 @@ import (
 
 // Disconnect from the broker.
 func (c *BaseClient) Disconnect(ctx context.Context) error {
+	c.muConnecting.RLock()
+	defer c.muConnecting.RUnlock()
+
 	pkt := pack(packetDisconnect.b())
 	c.connStateUpdate(StateDisconnected)
 	if err := c.write(pkt); err != nil {

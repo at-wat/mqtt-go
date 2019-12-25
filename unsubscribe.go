@@ -38,6 +38,9 @@ func (p *pktUnsubscribe) pack() []byte {
 
 // Unsubscribe topics.
 func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
+	c.muConnecting.RLock()
+	defer c.muConnecting.RUnlock()
+
 	id := c.newID()
 
 	chUnsubAck := make(chan *pktUnsubAck, 1)

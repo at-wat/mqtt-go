@@ -105,7 +105,11 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		}
 	}
 	c.sig = &signaller{}
+	c.mu.Lock()
 	c.connClosed = make(chan struct{})
+	c.muConnecting.Lock()
+	defer c.muConnecting.Unlock()
+	c.mu.Unlock()
 	c.initID()
 
 	go func() {
