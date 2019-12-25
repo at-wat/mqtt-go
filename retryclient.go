@@ -140,29 +140,12 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 
 // Connect to the broker.
 func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
-	c.muQueue.Lock()
-	oldPubQueue := append([]*Message{}, c.pubQueue...)
-	oldSubQueue := append([][]Subscription{}, c.subQueue...)
-	c.pubQueue = nil
-	c.subQueue = nil
-	c.muQueue.Unlock()
-
 	c.mu.Lock()
 	cli := c.Client
 	cli.Handle(c.handler)
 	c.mu.Unlock()
 
 	present, err := cli.Connect(ctx, clientID, opts...)
-
-	// Retry publish.
-	go func() {
-		for _, sub := range oldSubQueue {
-			c.subscribe(ctx, true, cli, sub...)
-		}
-		for _, msg := range oldPubQueue {
-			c.publish(ctx, true, cli, msg)
-		}
-	}()
 
 	return present, err
 }
@@ -182,5 +165,30 @@ func (c *RetryClient) Resubscribe(ctx context.Context) error {
 			c.subscribe(ctx, true, cli, sub...)
 		}
 	}
+	return nil
+}
+
+// Retry all queued publish/subscribe requests.
+func (c *RetryClient) Retry(ctx context.Context) error {
+	c.mu.Lock()
+	cli := c.Client
+	c.mu.Unlock()
+
+	c.muQueue.Lock()
+	oldPubQueue := append([]*Message{}, c.pubQueue...)
+	oldSubQueue := append([][]Subscription{}, c.subQueue...)
+	c.pubQueue = nil
+	c.subQueue = nil
+	c.muQueue.Unlock()
+
+	// Retry publish.
+	go func() {
+		for _, sub := range oldSubQueue {
+			c.subscribe(ctx, true, cli, sub...)
+		}
+		for _, msg := range oldPubQueue {
+			c.publish(ctx, true, cli, msg)
+		}
+	}()
 	return nil
 }
