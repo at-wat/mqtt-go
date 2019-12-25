@@ -31,7 +31,7 @@ func main() {
 	}
 	host := os.Args[1]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
 	defer cancel()
 
 	println("Connecting to", host)
