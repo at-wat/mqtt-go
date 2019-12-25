@@ -13,8 +13,8 @@ jobs:
       - name: push tags
         run: |
           git remote set-url origin https://${GITHUB_TOKEN}@github.com/at-wat/mqtt-go.git
-          git tag paho/${TAG}
-          git push origin paho/${TAG}
+          git tag paho/$(basename ${TAG})
+          git push origin paho/$(basename ${TAG})
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref }}
