@@ -24,7 +24,10 @@ import (
 func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ReconnectOption) (Client, error) {
 	rc := &RetryClient{}
 
-	options := &ReconnectOptions{}
+	options := &ReconnectOptions{
+		ReconnectWaitBase: time.Second,
+		ReconnectWaitMax:  10 * time.Second,
+	}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
 			return nil, err
@@ -57,12 +60,14 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 				clean = false // Clean only first time.
 				rc.SetClient(ctx, c)
 
-				if present, err := rc.Connect(ctx, clientID, optsCurr...); err == nil {
+				ctxTimeout, cancel := context.WithTimeout(ctx, options.Timeout)
+				if present, err := rc.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
+					cancel()
 					reconnWait = options.ReconnectWaitBase // Reset reconnect wait.
-					doneOnce.Do(func() { close(done) })
-					if present {
+					if !present {
 						rc.Resubscribe(ctx)
 					}
+					doneOnce.Do(func() { close(done) })
 					if options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
@@ -84,6 +89,7 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 						return
 					}
 				}
+				cancel()
 			}
 			select {
 			case <-time.After(reconnWait):
