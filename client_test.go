@@ -25,22 +25,31 @@ func TestProtocolViolation(t *testing.T) {
 	ca, cb := net.Pipe()
 	cli := &BaseClient{Transport: cb}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	go func() {
-		if _, err := cli.Connect(ctx, "cli"); err != nil {
-			if ctx.Err() == nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-		}
-	}()
-
 	errCh := make(chan error, 10)
 	cli.ConnState = func(s ConnState, err error) {
 		if s == StateClosed {
 			errCh <- err
 		}
 	}
+
+	if cli.connState.String() != "New" {
+		t.Errorf("Initial state must be 'New', but is '%s'", cli.connState)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	connected := make(chan struct{})
+	go func() {
+		if _, err := cli.Connect(ctx, "cli"); err != nil {
+			if ctx.Err() == nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+		}
+		if cli.connState.String() != "Active" {
+			t.Errorf("State after Connect must be 'Active', but is '%s'", cli.connState)
+		}
+		close(connected)
+	}()
 
 	b := make([]byte, 100)
 	if _, err := ca.Read(b); err != nil {
@@ -52,6 +61,12 @@ func TestProtocolViolation(t *testing.T) {
 		0x20, 0x02, 0x00, 0x00,
 	}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	select {
+	case <-connected:
+	case <-ctx.Done():
+		t.Error("Timeout")
 	}
 
 	// Send SUBSCRIBE from broker.
@@ -68,5 +83,8 @@ func TestProtocolViolation(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Error("Timeout")
+	}
+	if cli.connState.String() != "Closed" {
+		t.Errorf("Final state must be 'Closed' after protocol violation, but is '%s'", cli.connState)
 	}
 }

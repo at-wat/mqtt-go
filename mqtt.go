@@ -92,3 +92,18 @@ const (
 	StateClosed                        // connection is unexpectedly closed
 	StateDisconnected                  // connection is expectedly closed
 )
+
+func (s ConnState) String() string {
+	switch s {
+	case StateNew:
+		return "New"
+	case StateActive:
+		return "Active"
+	case StateClosed:
+		return "Closed"
+	case StateDisconnected:
+		return "Disconnected"
+	default:
+		return "Unknown"
+	}
+}
