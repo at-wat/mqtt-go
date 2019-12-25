@@ -31,7 +31,7 @@ func (p *pktPubComp) parse(flag byte, contents []byte) (*pktPubComp, error) {
 
 func (p *pktPubComp) pack() []byte {
 	return pack(
-		packetPubComp.b()|packetFromClient.b(),
+		packetPubComp.b(),
 		packUint16(p.ID),
 	)
 }

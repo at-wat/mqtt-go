@@ -31,7 +31,7 @@ func (p *pktPubAck) parse(flag byte, contents []byte) (*pktPubAck, error) {
 
 func (p *pktPubAck) pack() []byte {
 	return pack(
-		packetPubAck.b()|packetFromClient.b(),
+		packetPubAck.b(),
 		packUint16(p.ID),
 	)
 }
