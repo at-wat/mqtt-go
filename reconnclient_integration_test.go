@@ -167,7 +167,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						}),
 						"ReconnectClient"+name+pktName,
 						WithPingInterval(250*time.Millisecond),
-						WithTimeout(500*time.Millisecond),
+						WithTimeout(250*time.Millisecond),
 						WithReconnectWait(200*time.Millisecond, time.Second),
 					)
 					if err != nil {
@@ -192,14 +192,19 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
-					time.Sleep(time.Second)
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+							break
+						}
+					}
 
 					select {
 					case <-ctx.Done():
 						t.Fatalf("Unexpected error: '%v'", ctx.Err())
 					case <-chReceived:
-						cli.Disconnect(ctx)
 					}
+					cli.Disconnect(ctx)
 
 					cnt := atomic.LoadInt32(&dialCnt)
 					if cnt < 2 {
@@ -278,7 +283,7 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 				}),
 				"RetryClient"+name,
 				WithPingInterval(250*time.Millisecond),
-				WithTimeout(500*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
 				WithReconnectWait(200*time.Millisecond, time.Second),
 			)
 			if err != nil {
@@ -326,11 +331,11 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 			for {
 				time.Sleep(50 * time.Millisecond)
 				mu.Lock()
-				if len(received) == 10 {
-					mu.Unlock()
+				n := len(received)
+				mu.Unlock()
+				if n == 10 {
 					break
 				}
-				mu.Unlock()
 			}
 
 			cli.Disconnect(ctx)
