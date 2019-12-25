@@ -43,10 +43,18 @@ func main() {
 			url := fmt.Sprintf("wss://%s:9443?token=%x",
 				host, time.Now().UnixNano(),
 			)
-			println("new URL:", url)
-			return mqtt.Dial(url,
+			println("New URL:", url)
+			cli, err := mqtt.Dial(url,
 				mqtt.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 			)
+			if err != nil {
+				return nil, err
+			}
+			// Register ConnState callback to low level client
+			cli.ConnState = func(s mqtt.ConnState, err error) {
+				fmt.Printf("State changed to %s (err: %v)\n", s, err)
+			}
+			return cli, nil
 		}),
 		"sample", // Client ID
 		mqtt.WithConnectOption(
@@ -60,8 +68,6 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	println("Connected")
 
 	mux := &mqtt.ServeMux{}
 	cli.Handle(mux) // Register muxer as a low level handler.
@@ -77,7 +83,7 @@ func main() {
 
 	if err := cli.Subscribe(ctx,
 		mqtt.Subscription{
-			Topic: "test",
+			Topic: "stop",
 			QoS:   mqtt.QoS1,
 		},
 	); err != nil {
@@ -96,7 +102,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	println("Waiting message on 'test' topic")
+	println("Waiting message on 'stop' topic")
 	<-ctx.Done()
 
 	println("Disconnecting")
@@ -105,6 +111,4 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	println("Disconnected")
 }

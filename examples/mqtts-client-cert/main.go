@@ -34,7 +34,7 @@ func main() {
 	}
 	host := os.Args[1]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
 	defer cancel()
 
 	tlsConfig, err := newTLSConfig(
@@ -52,12 +52,28 @@ func main() {
 
 	cli, err := mqtt.NewReconnectClient(ctx,
 		// Dialer to connect/reconnect to the server.
-		&mqtt.URLDialer{
-			URL: fmt.Sprintf("mqtts://%s:8883", host),
-			Options: []mqtt.DialOption{
+		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
+			cli, err := mqtt.Dial(
+				fmt.Sprintf("mqtts://%s:8883", host),
 				mqtt.WithTLSConfig(tlsConfig),
-			},
-		},
+			)
+			if err != nil {
+				return nil, err
+			}
+			// Register ConnState callback to low level client
+			cli.ConnState = func(s mqtt.ConnState, err error) {
+				fmt.Printf("State changed to %s (err: %v)\n", s, err)
+			}
+			return cli, nil
+		}),
+		// If you don't need customized (with state callback) low layer client,
+		// just use mqtt.URLDialer:
+		// &mqtt.URLDialer{
+		//   URL: fmt.Sprintf("mqtts://%s:8883", host),
+		//   Options: []mqtt.DialOption{
+		//     mqtt.WithTLSConfig(tlsConfig),
+		//   },
+		// },
 		"sample", // Client ID
 		mqtt.WithConnectOption(
 			mqtt.WithKeepAlive(30),
@@ -77,8 +93,6 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	println("Connected")
 
 	mux := &mqtt.ServeMux{}
 	cli.Handle(mux) // Register muxer as a low level handler.
@@ -130,8 +144,6 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	println("Disconnected")
 }
 
 // newTLSConfig creates TLS configuration with client certificates.
