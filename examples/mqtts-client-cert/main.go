@@ -66,6 +66,14 @@ func main() {
 			}
 			return cli, nil
 		}),
+		// If you don't need customized (with state callback) low layer client,
+		// just use mqtt.URLDialer:
+		// &mqtt.URLDialer{
+		//   URL: fmt.Sprintf("mqtts://%s:8883", host),
+		//   Options: []mqtt.DialOption{
+		//     mqtt.WithTLSConfig(tlsConfig),
+		//   },
+		// },
 		"sample", // Client ID
 		mqtt.WithConnectOption(
 			mqtt.WithKeepAlive(30),
