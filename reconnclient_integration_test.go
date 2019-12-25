@@ -133,14 +133,6 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 			for pktName, head := range cases {
 				fIn, fOut := head.in, head.out
 				t.Run("StopAt"+pktName, func(t *testing.T) {
-					if pktName == "PublishOut" && name == "WebSockets" {
-						// Mosquitto doesn't publish the first retained message on
-						// reconnecting wss if the previous connection was aborted
-						// before PUBLISH packet.
-						// Other protocols work as expected.
-						t.SkipNow()
-					}
-
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 					var dialCnt int32
