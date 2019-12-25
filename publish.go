@@ -101,6 +101,9 @@ func (p *pktPublish) pack() []byte {
 // Publish a message to the broker.
 // ID field of the message is filled if zero.
 func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
+	c.muConnecting.RLock()
+	defer c.muConnecting.RUnlock()
+
 	if message.ID == 0 {
 		message.ID = c.newID()
 	}

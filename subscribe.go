@@ -62,6 +62,9 @@ func (p *pktSubscribe) pack() []byte {
 
 // Subscribe topics.
 func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error {
+	c.muConnecting.RLock()
+	defer c.muConnecting.RUnlock()
+
 	id := c.newID()
 
 	chSubAck := make(chan *pktSubAck, 1)
