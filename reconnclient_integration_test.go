@@ -19,6 +19,7 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -166,8 +167,8 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						}),
 						"ReconnectClient"+name+pktName,
 						WithPingInterval(250*time.Millisecond),
-						WithTimeout(100*time.Millisecond),
-						WithReconnectWait(100*time.Millisecond, time.Second),
+						WithTimeout(250*time.Millisecond),
+						WithReconnectWait(200*time.Millisecond, time.Second),
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -191,20 +192,159 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
-					time.Sleep(time.Second)
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+							break
+						}
+					}
 
 					select {
 					case <-ctx.Done():
 						t.Fatalf("Unexpected error: '%v'", ctx.Err())
 					case <-chReceived:
-						cli.Disconnect(ctx)
 					}
+					cli.Disconnect(ctx)
 
 					cnt := atomic.LoadInt32(&dialCnt)
 					if cnt < 2 {
 						t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
 					}
 				})
+			}
+		})
+	}
+}
+
+func newOnOffFilter(sw *int32) func([]byte) bool {
+	return func(b []byte) bool {
+		s := atomic.LoadInt32(sw)
+		return s != 0
+	}
+}
+
+func TestIntegration_ReconnectClient_Retry(t *testing.T) {
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			cliRecv, err := Dial(
+				url,
+				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			if _, err = cliRecv.Connect(ctx,
+				"RetryRecvClient"+name,
+			); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			if err := cliRecv.Subscribe(ctx, Subscription{
+				Topic: "test/Retry" + name,
+				QoS:   QoS1,
+			}); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			received := make(map[byte]bool)
+			var mu sync.Mutex
+			cliRecv.Handle(HandlerFunc(func(msg *Message) {
+				mu.Lock()
+				defer mu.Unlock()
+				received[msg.Payload[0]] = true
+			}))
+
+			var sw int32
+			chConnected := make(chan struct{}, 1)
+
+			cli, err := NewReconnectClient(
+				ctx,
+				DialerFunc(func() (ClientCloser, error) {
+					cli, err := Dial(url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						return nil, err
+					}
+					ca, cb := filteredpipe.DetectAndClosePipe(
+						newOnOffFilter(&sw),
+						newOnOffFilter(&sw),
+					)
+					filteredpipe.Connect(ca, cli.Transport)
+					cli.Transport = cb
+					cli.ConnState = func(s ConnState, err error) {
+						if s == StateActive {
+							chConnected <- struct{}{}
+						}
+					}
+					return cli, nil
+				}),
+				"RetryClient"+name,
+				WithPingInterval(250*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
+				WithReconnectWait(200*time.Millisecond, time.Second),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+
+			for i := 0; i < 5; i++ {
+				if err := cli.Publish(ctx, &Message{
+					Topic:   "test/Retry" + name,
+					QoS:     QoS1,
+					Retain:  true,
+					Payload: []byte{byte(i)},
+				}); err != nil {
+					t.Fatalf("Unexpected error: '%v'", err)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			// Disconnect
+			atomic.StoreInt32(&sw, 1)
+
+			for i := 5; i < 10; i++ {
+				if err := cli.Publish(ctx, &Message{
+					Topic:   "test/Retry" + name,
+					QoS:     QoS1,
+					Retain:  true,
+					Payload: []byte{byte(i)},
+				}); err != nil {
+					t.Fatalf("Unexpected error: '%v'", err)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			// Connect
+			atomic.StoreInt32(&sw, 0)
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+			for {
+				time.Sleep(50 * time.Millisecond)
+				mu.Lock()
+				n := len(received)
+				mu.Unlock()
+				if n == 10 {
+					break
+				}
+			}
+
+			cli.Disconnect(ctx)
+			cliRecv.Disconnect(ctx)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(received) != 10 {
+				t.Errorf("Messages lost on retry, sent: 10, got: %d\n%v", len(received), received)
 			}
 		})
 	}
