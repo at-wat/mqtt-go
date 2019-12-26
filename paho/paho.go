@@ -240,6 +240,8 @@ func (c *pahoWrapper) Publish(topic string, qos byte, retained bool, payload int
 			context.Background(),
 			&mqtt.Message{
 				Topic:   topic,
+				QoS:     mqtt.QoS(qos),
+				Retain:  retained,
 				Payload: p,
 			},
 		)
