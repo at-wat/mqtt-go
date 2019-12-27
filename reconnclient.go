@@ -128,7 +128,11 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 
 func (c *reconnectClient) Disconnect(ctx context.Context) error {
 	err := c.RetryClient.Disconnect(ctx)
-	<-c.done
+	select {
+	case <-c.done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return err
 }
 
