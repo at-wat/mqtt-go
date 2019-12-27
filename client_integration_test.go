@@ -129,65 +129,69 @@ func TestIntegration_Publish(t *testing.T) {
 	}
 }
 
-func TestIntegration_PublishQoS2_SubscribeQoS2(t *testing.T) {
+func TestIntegration_PublishSubscribe(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
-			cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+			for _, qos := range []QoS{QoS0, QoS1, QoS2} {
+				t.Run(fmt.Sprintf("QoS%d", int(qos)), func(t *testing.T) {
+					cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			chReceived := make(chan *Message, 100)
-			cli.ConnState = func(s ConnState, err error) {
-				switch s {
-				case StateActive:
-				case StateClosed:
-					close(chReceived)
-					t.Errorf("Connection is expected to be disconnected, but closed.")
-				case StateDisconnected:
-				}
-			}
+					chReceived := make(chan *Message, 100)
+					cli.ConnState = func(s ConnState, err error) {
+						switch s {
+						case StateActive:
+						case StateClosed:
+							close(chReceived)
+							t.Errorf("Connection is expected to be disconnected, but closed.")
+						case StateDisconnected:
+						}
+					}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if _, err := cli.Connect(ctx, "PubSubClient"+name); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if _, err := cli.Connect(ctx, "PubSubClient"+name); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			cli.Handle(HandlerFunc(func(msg *Message) {
-				chReceived <- msg
-			}))
+					cli.Handle(HandlerFunc(func(msg *Message) {
+						chReceived <- msg
+					}))
 
-			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: qos}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			if err := cli.Publish(ctx, &Message{
-				Topic:   "test",
-				QoS:     QoS2,
-				Payload: []byte("message"),
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					if err := cli.Publish(ctx, &Message{
+						Topic:   "test",
+						QoS:     qos,
+						Payload: []byte("message"),
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			select {
-			case <-ctx.Done():
-				t.Fatalf("Unexpected error: '%v'", ctx.Err())
-			case msg, ok := <-chReceived:
-				if !ok {
-					t.Errorf("Connection closed unexpectedly")
-					break
-				}
-				if msg.Topic != "test" {
-					t.Errorf("Expected topic name of 'test', got '%s'", msg.Topic)
-				}
-				if !bytes.Equal(msg.Payload, []byte("message")) {
-					t.Errorf("Expected payload of '%v', got '%v'", []byte("message"), msg.Payload)
-				}
-			}
+					select {
+					case <-ctx.Done():
+						t.Fatalf("Unexpected error: '%v'", ctx.Err())
+					case msg, ok := <-chReceived:
+						if !ok {
+							t.Errorf("Connection closed unexpectedly")
+							break
+						}
+						if msg.Topic != "test" {
+							t.Errorf("Expected topic name of 'test', got '%s'", msg.Topic)
+						}
+						if !bytes.Equal(msg.Payload, []byte("message")) {
+							t.Errorf("Expected payload of '%v', got '%v'", []byte("message"), msg.Payload)
+						}
+					}
 
-			if err := cli.Disconnect(ctx); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
+					if err := cli.Disconnect(ctx); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+				})
 			}
 		})
 	}
