@@ -47,7 +47,7 @@ func (m *ServeMux) Handle(filter string, handler Handler) error {
 func (m *ServeMux) Serve(message *Message) {
 	for _, h := range m.handlers {
 		if h.filter.Match(message.Topic) {
-			h.handler.Serve(message)
+			h.handler.Serve(message.clone())
 		}
 	}
 }
