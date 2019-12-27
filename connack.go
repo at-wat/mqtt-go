@@ -58,6 +58,9 @@ func (p *pktConnAck) parse(flag byte, contents []byte) (*pktConnAck, error) {
 	if flag != 0 {
 		return nil, ErrInvalidPacket
 	}
+	if len(contents) != 2 {
+		return nil, ErrInvalidPacketLength
+	}
 	return &pktConnAck{
 		SessionPresent: (contents[0]&0x01 != 0),
 		Code:           ConnectionReturnCode(contents[1]),
