@@ -20,9 +20,18 @@ import (
 	"time"
 )
 
+type reconnectClient struct {
+	*RetryClient
+	done chan struct{}
+}
+
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
 func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ReconnectOption) (Client, error) {
 	rc := &RetryClient{}
+	reconnCli := &reconnectClient{
+		RetryClient: rc,
+		done:        make(chan struct{}),
+	}
 
 	options := &ReconnectOptions{
 		ReconnectWaitBase: time.Second,
@@ -51,6 +60,9 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 	done := make(chan struct{})
 	var doneOnce sync.Once
 	go func() {
+		defer func() {
+			close(reconnCli.done)
+		}()
 		clean := connOptions.CleanSession
 		reconnWait := options.ReconnectWaitBase
 		for {
@@ -111,7 +123,13 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	return rc, nil
+	return reconnCli, nil
+}
+
+func (c *reconnectClient) Disconnect(ctx context.Context) error {
+	err := c.RetryClient.Disconnect(ctx)
+	<-c.done
+	return err
 }
 
 // ReconnectOptions represents options for Connect.
