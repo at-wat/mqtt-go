@@ -30,16 +30,6 @@ const (
 	SubscribeFailure QoS = 0x80 // Rejected to subscribe
 )
 
-// Message represents MQTT message.
-type Message struct {
-	Topic   string
-	ID      uint16
-	QoS     QoS
-	Retain  bool
-	Dup     bool
-	Payload []byte
-}
-
 // Subscription represents MQTT subscription target.
 type Subscription struct {
 	Topic string
