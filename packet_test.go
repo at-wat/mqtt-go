@@ -26,6 +26,7 @@ func TestRemainingLength(t *testing.T) {
 	}{
 		{64, []byte{0x40}},
 		{321, []byte{0xC1, 0x02}},
+		{100000, []byte{0xA0, 0x8D, 0x06}},
 		{268435455, []byte{0xFF, 0xFF, 0xFF, 0x7F}},
 	}
 
