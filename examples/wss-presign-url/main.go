@@ -36,7 +36,7 @@ func main() {
 
 	println("Connecting to", host)
 
-	cli, err := mqtt.NewReconnectClient(ctx,
+	cli, err := mqtt.NewReconnectClient(
 		// Dialer to connect/reconnect to the server.
 		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
 			// Presign URL here.
@@ -56,13 +56,17 @@ func main() {
 			}
 			return cli, nil
 		}),
-		"sample", // Client ID
-		mqtt.WithConnectOption(
-			mqtt.WithKeepAlive(30),
-		),
 		mqtt.WithPingInterval(10*time.Second),
 		mqtt.WithTimeout(5*time.Second),
 		mqtt.WithReconnectWait(1*time.Second, 15*time.Second),
+	)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = cli.Connect(ctx,
+		"sample", // Client ID
+		mqtt.WithKeepAlive(30),
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
