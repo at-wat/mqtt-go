@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,16 @@ func TestRemainingLength(t *testing.T) {
 		if !bytes.Equal(c.b, r) {
 			t.Errorf("%d must be encoded to: %v, got: %v", c.n, c.b, r)
 		}
+	}
+}
+
+func TestPacketType(t *testing.T) {
+	if packetConnect.String() != "CONNECT" {
+		t.Errorf("Expected packetConnect.String(): CONNECT, got: %s", packetConnect.String())
+	}
+	if !strings.HasPrefix(packetType(0xFF).String(), "Unknown") {
+		t.Errorf("Expected invlidPacketType.String(): Unknown..., got: %s",
+			packetType(0xFF).String(),
+		)
 	}
 }

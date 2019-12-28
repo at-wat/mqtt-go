@@ -52,36 +52,26 @@ func (t packetType) b() byte {
 	return byte(t)
 }
 
+var packetTypeString = map[packetType]string{
+	packetConnect:     "CONNECT",
+	packetConnAck:     "CONNACK",
+	packetPublish:     "PUBLISH",
+	packetPubAck:      "PUBACK",
+	packetPubRec:      "PUBREC",
+	packetPubRel:      "PUBREL",
+	packetPubComp:     "PUBCOMP",
+	packetSubscribe:   "SUBSCRIBE",
+	packetSubAck:      "SUBACK",
+	packetUnsubscribe: "UNSUBSCRIBE",
+	packetUnsubAck:    "UNSUBACK",
+	packetPingReq:     "PINGREQ",
+	packetPingResp:    "PINGRESP",
+	packetDisconnect:  "DISCONNECT",
+}
+
 func (t packetType) String() string {
-	switch t {
-	case packetConnect:
-		return "CONNECT"
-	case packetConnAck:
-		return "CONNACK"
-	case packetPublish:
-		return "PUBLISH"
-	case packetPubAck:
-		return "PUBACK"
-	case packetPubRec:
-		return "PUBREC"
-	case packetPubRel:
-		return "PUBREL"
-	case packetPubComp:
-		return "PUBCOMP"
-	case packetSubscribe:
-		return "SUBSCRIBE"
-	case packetSubAck:
-		return "SUBACK"
-	case packetUnsubscribe:
-		return "UNSUBSCRIBE"
-	case packetUnsubAck:
-		return "UNSUBACK"
-	case packetPingReq:
-		return "PINGREQ"
-	case packetPingResp:
-		return "PINGRESP"
-	case packetDisconnect:
-		return "DISCONNECT"
+	if s, ok := packetTypeString[t]; ok {
+		return s
 	}
 	return fmt.Sprintf("Unknown packet type %x", int(t))
 }
