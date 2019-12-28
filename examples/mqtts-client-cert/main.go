@@ -50,7 +50,7 @@ func main() {
 
 	println("Connecting to", host)
 
-	cli, err := mqtt.NewReconnectClient(ctx,
+	cli, err := mqtt.NewReconnectClient(
 		// Dialer to connect/reconnect to the server.
 		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
 			cli, err := mqtt.Dial(
@@ -74,20 +74,24 @@ func main() {
 		//     mqtt.WithTLSConfig(tlsConfig),
 		//   },
 		// },
-		"sample", // Client ID
-		mqtt.WithConnectOption(
-			mqtt.WithKeepAlive(30),
-			mqtt.WithWill(
-				&mqtt.Message{
-					Topic:   "test",
-					QoS:     mqtt.QoS1,
-					Payload: []byte("{\"message\": \"Bye\"}"),
-				},
-			),
-		),
 		mqtt.WithPingInterval(10*time.Second),
 		mqtt.WithTimeout(5*time.Second),
 		mqtt.WithReconnectWait(1*time.Second, 15*time.Second),
+	)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = cli.Connect(ctx,
+		"sample", // Client ID
+		mqtt.WithKeepAlive(30),
+		mqtt.WithWill(
+			&mqtt.Message{
+				Topic:   "test",
+				QoS:     mqtt.QoS1,
+				Payload: []byte("{\"message\": \"Bye\"}"),
+			},
+		),
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

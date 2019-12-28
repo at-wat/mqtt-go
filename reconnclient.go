@@ -22,17 +22,13 @@ import (
 
 type reconnectClient struct {
 	*RetryClient
-	done chan struct{}
+	done    chan struct{}
+	options *ReconnectOptions
+	dialer  Dialer
 }
 
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
-func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opts ...ReconnectOption) (Client, error) {
-	rc := &RetryClient{}
-	reconnCli := &reconnectClient{
-		RetryClient: rc,
-		done:        make(chan struct{}),
-	}
-
+func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) {
 	options := &ReconnectOptions{
 		ReconnectWaitBase: time.Second,
 		ReconnectWaitMax:  10 * time.Second,
@@ -42,60 +38,71 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 			return nil, err
 		}
 	}
+	return &reconnectClient{
+		RetryClient: &RetryClient{},
+		done:        make(chan struct{}),
+		options:     options,
+		dialer:      dialer,
+	}, nil
+}
+
+// Connect starts connection retry loop.
+func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (bool, error) {
 	connOptions := &ConnectOptions{
 		CleanSession: true,
 	}
-	for _, opt := range options.ConnectOptions {
+	for _, opt := range opts {
 		if err := opt(connOptions); err != nil {
-			return nil, err
+			return false, err
 		}
 	}
-	if options.PingInterval == time.Duration(0) {
-		options.PingInterval = time.Duration(connOptions.KeepAlive) * time.Second
+	if c.options.PingInterval == time.Duration(0) {
+		c.options.PingInterval = time.Duration(connOptions.KeepAlive) * time.Second
 	}
-	if options.Timeout == time.Duration(0) {
-		options.Timeout = options.PingInterval
+	if c.options.Timeout == time.Duration(0) {
+		c.options.Timeout = c.options.PingInterval
 	}
 
 	done := make(chan struct{})
 	var doneOnce sync.Once
+	var sessionPresent bool
 	go func() {
 		defer func() {
-			close(reconnCli.done)
+			close(c.done)
 		}()
 		clean := connOptions.CleanSession
-		reconnWait := options.ReconnectWaitBase
+		reconnWait := c.options.ReconnectWaitBase
 		for {
-			if c, err := dialer.Dial(); err == nil {
-				optsCurr := append([]ConnectOption{}, options.ConnectOptions...)
+			if baseCli, err := c.dialer.Dial(); err == nil {
+				optsCurr := append([]ConnectOption{}, opts...)
 				optsCurr = append(optsCurr, WithCleanSession(clean))
 				clean = false // Clean only first time.
-				rc.SetClient(ctx, c)
+				c.RetryClient.SetClient(ctx, baseCli)
 
-				ctxTimeout, cancel := context.WithTimeout(ctx, options.Timeout)
-				if present, err := rc.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
+				ctxTimeout, cancel := context.WithTimeout(ctx, c.options.Timeout)
+				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
 					cancel()
 
-					if !present {
-						rc.Resubscribe(ctx)
+					if !sessionPresent {
+						c.RetryClient.Resubscribe(ctx)
 					}
-					rc.Retry(ctx)
+					c.RetryClient.Retry(ctx)
 
-					if options.PingInterval > time.Duration(0) {
+					if c.options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
 							_ = KeepAlive(
-								ctx, c,
-								options.PingInterval,
-								options.Timeout,
+								ctx, baseCli,
+								c.options.PingInterval,
+								c.options.Timeout,
 							)
 						}()
 					}
-					reconnWait = options.ReconnectWaitBase // Reset reconnect wait.
+					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
 					doneOnce.Do(func() { close(done) })
 					select {
-					case <-c.Done():
-						if err := c.Err(); err == nil {
+					case <-baseCli.Done():
+						if err := baseCli.Err(); err == nil {
 							// Disconnected as expected; don't restart.
 							return
 						}
@@ -113,19 +120,20 @@ func NewReconnectClient(ctx context.Context, dialer Dialer, clientID string, opt
 				return
 			}
 			reconnWait *= 2
-			if reconnWait > options.ReconnectWaitMax {
-				reconnWait = options.ReconnectWaitMax
+			if reconnWait > c.options.ReconnectWaitMax {
+				reconnWait = c.options.ReconnectWaitMax
 			}
 		}
 	}()
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return false, ctx.Err()
 	}
-	return reconnCli, nil
+	return sessionPresent, nil
 }
 
+// Disconnect from the broker.
 func (c *reconnectClient) Disconnect(ctx context.Context) error {
 	err := c.RetryClient.Disconnect(ctx)
 	select {
@@ -147,14 +155,6 @@ type ReconnectOptions struct {
 
 // ReconnectOption sets option for Connect.
 type ReconnectOption func(*ReconnectOptions) error
-
-// WithConnectOption sets ConnectOption to ReconnectClient.
-func WithConnectOption(connOpts ...ConnectOption) ReconnectOption {
-	return func(o *ReconnectOptions) error {
-		o.ConnectOptions = connOpts
-		return nil
-	}
-}
 
 // WithTimeout sets timeout duration of server response.
 // Default value is PingInterval.

@@ -35,21 +35,24 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 
 			chReceived := make(chan *Message, 100)
 			cli, err := NewReconnectClient(
-				ctx,
 				&URLDialer{
 					URL: url,
 					Options: []DialOption{
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					},
 				},
-				"ReconnectClient"+name,
-				WithConnectOption(
-					WithKeepAlive(10),
-					WithCleanSession(true),
-				),
 				WithPingInterval(time.Second),
 				WithTimeout(time.Second),
 				WithReconnectWait(time.Second, 10*time.Second),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			_, err = cli.Connect(
+				ctx,
+				"ReconnectClient"+name,
+				WithKeepAlive(10),
+				WithCleanSession(true),
 			)
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -148,7 +151,6 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 
 					chReceived := make(chan *Message, 100)
 					cli, err := NewReconnectClient(
-						ctx,
 						DialerFunc(func() (ClientCloser, error) {
 							cli, err := Dial(url,
 								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
@@ -165,10 +167,16 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 							cli.Transport = cb
 							return cli, nil
 						}),
-						"ReconnectClient"+name+pktName,
 						WithPingInterval(250*time.Millisecond),
 						WithTimeout(250*time.Millisecond),
 						WithReconnectWait(200*time.Millisecond, time.Second),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					_, err = cli.Connect(
+						ctx,
+						"ReconnectClient"+name+pktName,
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -260,7 +268,6 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 			chConnected := make(chan struct{}, 1)
 
 			cli, err := NewReconnectClient(
-				ctx,
 				DialerFunc(func() (ClientCloser, error) {
 					cli, err := Dial(url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
@@ -281,10 +288,16 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 					}
 					return cli, nil
 				}),
-				"RetryClient"+name,
 				WithPingInterval(250*time.Millisecond),
 				WithTimeout(250*time.Millisecond),
 				WithReconnectWait(200*time.Millisecond, time.Second),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			cli.Connect(
+				ctx,
+				"RetryClient"+name,
 			)
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
