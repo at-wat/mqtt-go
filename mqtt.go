@@ -84,17 +84,16 @@ const (
 	StateDisconnected                  // connection is expectedly closed
 )
 
+var connStateString = map[ConnState]string{
+	StateNew:          "New",
+	StateActive:       "Active",
+	StateClosed:       "Closed",
+	StateDisconnected: "Disconnected",
+}
+
 func (s ConnState) String() string {
-	switch s {
-	case StateNew:
-		return "New"
-	case StateActive:
-		return "Active"
-	case StateClosed:
-		return "Closed"
-	case StateDisconnected:
-		return "Disconnected"
-	default:
-		return "Unknown"
+	if str, ok := connStateString[s]; ok {
+		return str
 	}
+	return "Unknown"
 }
