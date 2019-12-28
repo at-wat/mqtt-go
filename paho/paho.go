@@ -99,7 +99,7 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 	go func() {
 		pingInterval := time.Duration(c.pahoConfig.KeepAlive) * time.Second
 
-		cli, err := mqtt.NewReconnectClient(context.Background(),
+		cli, err := mqtt.NewReconnectClient(
 			mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
 				cb, err := mqtt.Dial(c.pahoConfig.Servers[0].String(),
 					mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
@@ -124,8 +124,6 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 				c.mu.Unlock()
 				return cb, err
 			}),
-			c.pahoConfig.ClientID,
-			mqtt.WithConnectOption(opts...),
 			mqtt.WithPingInterval(pingInterval),
 			mqtt.WithTimeout(c.pahoConfig.PingTimeout),
 			mqtt.WithReconnectWait(
@@ -133,6 +131,11 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 				10*time.Second, // c.pahoConfig.MaxReconnectInterval,
 			),
 		)
+		if err != nil {
+			token.err = err
+			token.release()
+		}
+		_, err = cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
 		if err != nil {
 			token.err = err
 			token.release()
