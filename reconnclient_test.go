@@ -32,6 +32,7 @@ func TestReconnectClient_DefaultOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
+	cancel()
 	_, err = cli.Connect(ctx,
 		"ReconnectClient",
 		WithKeepAlive(uint16(keepAlive)),
