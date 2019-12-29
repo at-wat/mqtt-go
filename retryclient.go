@@ -40,8 +40,7 @@ func (c *RetryClient) Handle(handler Handler) {
 }
 
 // Publish tries to publish the message and immediately return nil.
-// If it is not acknowledged to be published, the message will be queued and
-// retried on the next connection.
+// If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	go func() {
 		c.mu.Lock()
@@ -53,8 +52,7 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 }
 
 // Subscribe tries to subscribe the topic and immediately return nil.
-// If it is not acknowledged to be subscribed, the request will be queued and
-// retried on the next connection.
+// If it is not acknowledged to be subscribed, the request will be queued.
 func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
 	go func() {
 		c.mu.Lock()
@@ -131,7 +129,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 }
 
 // SetClient sets the new Client.
-// If there are any queued messages, retry to publish them.
+// Call Retry() and Resubscribe() to process queued messages and subscriptions.
 func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
