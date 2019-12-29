@@ -142,18 +142,18 @@ func unpackUint16(b []byte) (int, uint16) {
 
 func unpackString(b []byte) (int, string, error) {
 	if len(b) < 2 {
-		return 0, "", ErrInvalidPacketLength
+		return 0, "", wrapError(ErrInvalidPacketLength, "unpacking string length")
 	}
 	nHeader, n := unpackUint16(b)
 	if int(n)+nHeader > len(b) {
-		return 0, "", ErrInvalidPacketLength
+		return 0, "", wrapError(ErrInvalidPacketLength, "unpacking string contents")
 	}
 
 	// Validate UTF-8 runes according to MQTT-1.5.3-1 and MQTT-1.5.3-2.
 	rs := []rune(string(b[nHeader : int(n)+nHeader]))
 	for _, r := range rs {
 		if r == 0x0000 || (0xD800 <= r && r <= 0xDFFF) {
-			return 0, "", ErrInvalidRune
+			return 0, "", wrapErrorf(ErrInvalidRune, "unpacked string contains 0x%x", int(r))
 		}
 	}
 	return int(n) + nHeader, string(rs), nil

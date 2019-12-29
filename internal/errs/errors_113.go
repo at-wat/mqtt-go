@@ -1,3 +1,5 @@
+// +build go1.13
+
 // Copyright 2019 The mqtt-go authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +14,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mqtt
+// Package errs is for compatibility with Go1.13 error wrapping.
+package errs
 
-type pktPubRel struct {
-	ID uint16
-}
+import (
+	"errors"
+)
 
-func (p *pktPubRel) parse(flag byte, contents []byte) (*pktPubRel, error) {
-	if flag != 0x02 {
-		return nil, wrapError(ErrInvalidPacket, "parsing PUBREL")
-	}
-	if len(contents) < 2 {
-		return nil, wrapError(ErrInvalidPacketLength, "parsing PUBREL")
-	}
-	_, p.ID = unpackUint16(contents)
-	return p, nil
-}
-
-func (p *pktPubRel) pack() []byte {
-	return pack(
-		packetPubRel.b()|packetFromClient.b(),
-		packUint16(p.ID),
-	)
+// Is compares error type. Wrapping Go1.13 errors.Is().
+func Is(err, target error) bool {
+	return errors.Is(err, target)
 }

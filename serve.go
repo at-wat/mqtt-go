@@ -174,7 +174,7 @@ func (c *BaseClient) serve() error {
 			}
 		default:
 			// must close connection if the client encountered protocol violation.
-			return ErrInvalidPacket
+			return wrapErrorf(ErrInvalidPacket, "serving incoming packet %x", int(pktType))
 		}
 	}
 }

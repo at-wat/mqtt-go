@@ -53,7 +53,7 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 
 	pkt := (&pktUnsubscribe{ID: id, Topics: subs}).pack()
 	if err := c.write(pkt); err != nil {
-		return err
+		return wrapError(err, "sending UNSUBSCRIBE")
 	}
 	select {
 	case <-c.connClosed:

@@ -30,7 +30,7 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 
 	pkt := pack(packetPingReq.b())
 	if err := c.write(pkt); err != nil {
-		return err
+		return wrapError(err, "sending PINGREQ")
 	}
 	select {
 	case <-c.connClosed:

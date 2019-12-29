@@ -20,10 +20,10 @@ type pktPubAck struct {
 
 func (p *pktPubAck) parse(flag byte, contents []byte) (*pktPubAck, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing PUBACK")
 	}
 	if len(contents) < 2 {
-		return nil, ErrInvalidPacketLength
+		return nil, wrapError(ErrInvalidPacketLength, "parsing PUBACK")
 	}
 	_, p.ID = unpackUint16(contents)
 	return p, nil

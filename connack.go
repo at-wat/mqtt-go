@@ -56,10 +56,10 @@ type pktConnAck struct {
 
 func (p *pktConnAck) parse(flag byte, contents []byte) (*pktConnAck, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing CONNACK")
 	}
 	if len(contents) != 2 {
-		return nil, ErrInvalidPacketLength
+		return nil, wrapError(ErrInvalidPacketLength, "parsing CONNACK")
 	}
 	return &pktConnAck{
 		SessionPresent: (contents[0]&0x01 != 0),

@@ -77,7 +77,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 
 	pkt := (&pktSubscribe{ID: id, Subscriptions: subs}).pack()
 	if err := c.write(pkt); err != nil {
-		return err
+		return wrapError(err, "sending SUBSCRIBE")
 	}
 	select {
 	case <-c.connClosed:
@@ -87,7 +87,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 	case subAck := <-chSubAck:
 		if len(subAck.Codes) != len(subs) {
 			c.Transport.Close()
-			return ErrInvalidSubAck
+			return wrapErrorf(ErrInvalidSubAck, "subscribing %d topics: %d topics in SUBACK", len(subs), len(subAck.Codes))
 		}
 		for i := 0; i < len(subAck.Codes); i++ {
 			subs[i].QoS = QoS(subAck.Codes[i])

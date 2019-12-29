@@ -20,10 +20,10 @@ type pktPubComp struct {
 
 func (p *pktPubComp) parse(flag byte, contents []byte) (*pktPubComp, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing PUBCOMP")
 	}
 	if len(contents) < 2 {
-		return nil, ErrInvalidPacketLength
+		return nil, wrapError(ErrInvalidPacketLength, "parsing PUBCOMP")
 	}
 	_, p.ID = unpackUint16(contents)
 	return p, nil

@@ -46,7 +46,9 @@ func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
 	case publishFlagQoS2:
 		p.Message.QoS = QoS2
 	default:
-		return nil, ErrInvalidPacket
+		return nil, wrapErrorf(
+			ErrInvalidPacket, "parsing PUBLISH: QoS %d", int(publishFlag(flag)&publishFlagQoSMask),
+		)
 	}
 
 	var n, nID int
@@ -57,7 +59,7 @@ func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
 	}
 	if p.Message.QoS != QoS0 {
 		if len(contents)-n < 2 {
-			return nil, ErrInvalidPacketLength
+			return nil, wrapError(ErrInvalidPacketLength, "parsing PUBLISH")
 		}
 		nID, p.Message.ID = unpackUint16(contents[n:])
 	}
@@ -137,7 +139,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 
 	pkt := (&pktPublish{Message: message}).pack()
 	if err := c.write(pkt); err != nil {
-		return err
+		return wrapError(err, "sending PUBLISH")
 	}
 	switch message.QoS {
 	case QoS1:
@@ -158,7 +160,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		}
 		pktPubRel := (&pktPubRel{ID: message.ID}).pack()
 		if err := c.write(pktPubRel); err != nil {
-			return err
+			return wrapError(err, "sending PUBREL")
 		}
 		select {
 		case <-c.connClosed:
