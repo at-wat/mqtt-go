@@ -29,12 +29,12 @@ func (c *BaseClient) serve() error {
 		pktType := packetType(pktTypeBytes[0] & 0xF0)
 		pktFlag := pktTypeBytes[0] & 0x0F
 		var remainingLength int
-		for {
+		for shift := uint(0); ; shift += 7 {
 			b := make([]byte, 1)
 			if _, err := io.ReadFull(r, b); err != nil {
 				return err
 			}
-			remainingLength = (remainingLength << 7) | (int(b[0]) & 0x7F)
+			remainingLength |= (int(b[0]) & 0x7F) << shift
 			if !(b[0]&0x80 != 0) {
 				break
 			}
