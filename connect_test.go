@@ -174,19 +174,21 @@ func TestConnect_Error(t *testing.T) {
 			ca, cb := net.Pipe()
 			cli := &BaseClient{Transport: cb}
 
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
 			go func() {
 				if _, err := ca.Read(make([]byte, 100)); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
+					t.Errorf("Unexpected error: '%v'", err)
+					cancel()
 				}
-
 				// Send CONNACK.
 				if _, err := ca.Write(c.response); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
+					t.Errorf("Unexpected error: '%v'", err)
+					cancel()
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
 			_, err := cli.Connect(ctx, "cli")
 			if err == nil {
 				t.Fatal("Error is not returned on connection refuse")

@@ -42,7 +42,8 @@ func TestProtocolViolation(t *testing.T) {
 	go func() {
 		if _, err := cli.Connect(ctx, "cli"); err != nil {
 			if ctx.Err() == nil {
-				t.Fatalf("Unexpected error: '%v'", err)
+				t.Errorf("Unexpected error: '%v'", err)
+				cancel()
 			}
 		}
 		if cli.connState.String() != "Active" {

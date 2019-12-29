@@ -151,7 +151,7 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 }
 
 // Resubscribe subscribes all established subscriptions.
-func (c *RetryClient) Resubscribe(ctx context.Context) error {
+func (c *RetryClient) Resubscribe(ctx context.Context) {
 	c.muQueue.Lock()
 	oldSubEstablished := append([][]Subscription{}, c.subEstablished...)
 	c.subEstablished = nil
@@ -165,11 +165,10 @@ func (c *RetryClient) Resubscribe(ctx context.Context) error {
 			c.subscribe(ctx, true, cli, sub...)
 		}
 	}
-	return nil
 }
 
 // Retry all queued publish/subscribe requests.
-func (c *RetryClient) Retry(ctx context.Context) error {
+func (c *RetryClient) Retry(ctx context.Context) {
 	c.mu.Lock()
 	cli := c.Client
 	c.mu.Unlock()
@@ -190,5 +189,4 @@ func (c *RetryClient) Retry(ctx context.Context) error {
 			c.publish(ctx, true, cli, msg)
 		}
 	}()
-	return nil
 }
