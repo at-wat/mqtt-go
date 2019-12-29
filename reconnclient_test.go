@@ -33,10 +33,12 @@ func TestReconnectClient_DefaultOptions(t *testing.T) {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 	cancel()
-	_, err = cli.Connect(ctx,
+	if _, err = cli.Connect(ctx,
 		"ReconnectClient",
 		WithKeepAlive(uint16(keepAlive)),
-	)
+	); err != context.Canceled {
+		t.Fatalf("Expected error: '%v', got: '%v'", context.Canceled, err)
+	}
 	reconnCli := cli.(*reconnectClient)
 	if int(reconnCli.options.Timeout/time.Second) != keepAlive {
 		t.Errorf("Default Timeout should be same as KeepAlice, expected: %d, got %d",
