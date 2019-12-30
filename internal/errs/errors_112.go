@@ -1,3 +1,5 @@
+// +build !go1.13
+
 // Copyright 2019 The mqtt-go authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +14,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mqtt
+package errs
 
-type pktPubRel struct {
-	ID uint16
-}
-
-func (p *pktPubRel) parse(flag byte, contents []byte) (*pktPubRel, error) {
-	if flag != 0x02 {
-		return nil, wrapError(ErrInvalidPacket, "parsing PUBREL")
+// Is compares error type. Works like Go1.13 errors.Is().
+func Is(err, target error) bool {
+	if target == nil {
+		return err == nil
 	}
-	if len(contents) < 2 {
-		return nil, wrapError(ErrInvalidPacketLength, "parsing PUBREL")
+	for {
+		if err == target {
+			return true
+		}
+		if err == nil {
+			return false
+		}
+		if x, ok := err.(interface{ Is(error) bool }); ok {
+			return x.Is(target)
+		}
+		x, ok := err.(interface{ Unwrap() error })
+		if !ok {
+			return false
+		}
+		err = x.Unwrap()
 	}
-	_, p.ID = unpackUint16(contents)
-	return p, nil
-}
-
-func (p *pktPubRel) pack() []byte {
-	return pack(
-		packetPubRel.b()|packetFromClient.b(),
-		packUint16(p.ID),
-	)
 }

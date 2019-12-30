@@ -26,7 +26,7 @@ func (c *BaseClient) Disconnect(ctx context.Context) error {
 	pkt := pack(packetDisconnect.b())
 	c.connStateUpdate(StateDisconnected)
 	if err := c.write(pkt); err != nil {
-		return err
+		return wrapError(err, "sending DISCONNECT")
 	}
 	c.Transport.Close()
 	return nil

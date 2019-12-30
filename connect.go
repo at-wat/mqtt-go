@@ -142,7 +142,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}).pack()
 
 	if err := c.write(pkt); err != nil {
-		return false, err
+		return false, wrapError(err, "sending CONNECT")
 	}
 	select {
 	case <-c.connClosed:

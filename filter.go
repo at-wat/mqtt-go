@@ -26,7 +26,7 @@ type topicFilter []string
 
 func newTopicFilter(filter string) (topicFilter, error) {
 	if len(filter) == 0 {
-		return nil, ErrInvalidTopicFilter
+		return nil, wrapError(ErrInvalidTopicFilter, "empty filter")
 	}
 	tf := strings.Split(filter, "/")
 
@@ -34,12 +34,12 @@ func newTopicFilter(filter string) (topicFilter, error) {
 	for i, f := range tf {
 		if strings.Contains(f, "+") {
 			if len(f) != 1 {
-				return nil, ErrInvalidTopicFilter
+				return nil, wrapError(ErrInvalidTopicFilter, "invalid + usage")
 			}
 		}
 		if strings.Contains(f, "#") {
 			if len(f) != 1 || i != len(tf)-1 {
-				return nil, ErrInvalidTopicFilter
+				return nil, wrapError(ErrInvalidTopicFilter, "invalid # usage")
 			}
 		}
 	}

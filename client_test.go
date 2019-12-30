@@ -19,6 +19,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestProtocolViolation(t *testing.T) {
@@ -79,7 +81,7 @@ func TestProtocolViolation(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		if err != ErrInvalidPacket {
+		if !errs.Is(err, ErrInvalidPacket) {
 			t.Errorf("Expected error against invalid packet: '%v', got: '%v'", ErrInvalidPacket, err)
 		}
 	case <-ctx.Done():

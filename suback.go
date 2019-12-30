@@ -21,7 +21,7 @@ type pktSubAck struct {
 
 func (p *pktSubAck) parse(flag byte, contents []byte) (*pktSubAck, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing SUBSCK")
 	}
 	p.ID = uint16(contents[0])<<8 | uint16(contents[1])
 	for _, c := range contents[2:] {

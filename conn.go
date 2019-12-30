@@ -127,7 +127,7 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 		ws.PayloadType = websocket.BinaryFrame
 		c.Transport = ws
 	default:
-		return nil, ErrUnsupportedProtocol
+		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
 	}
 	return c, nil
 }

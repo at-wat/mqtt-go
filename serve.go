@@ -79,12 +79,12 @@ func (c *BaseClient) serve() error {
 				}
 				pktPubAck := (&pktPubAck{ID: publish.Message.ID}).pack()
 				if err := c.write(pktPubAck); err != nil {
-					return err
+					return wrapError(err, "sending PUBACK")
 				}
 			case QoS2:
 				pktPubRec := (&pktPubRec{ID: publish.Message.ID}).pack()
 				if err := c.write(pktPubRec); err != nil {
-					return err
+					return wrapError(err, "sending PUBREC")
 				}
 				subBuffer[publish.Message.ID] = publish.Message
 			}
@@ -128,7 +128,7 @@ func (c *BaseClient) serve() error {
 
 			pktPubComp := (&pktPubComp{ID: pubRel.ID}).pack()
 			if err := c.write(pktPubComp); err != nil {
-				return err
+				return wrapError(err, "sending PUBCOMP")
 			}
 		case packetPubComp:
 			pubComp, err := (&pktPubComp{}).parse(pktFlag, contents)
@@ -174,7 +174,7 @@ func (c *BaseClient) serve() error {
 			}
 		default:
 			// must close connection if the client encountered protocol violation.
-			return ErrInvalidPacket
+			return wrapErrorf(ErrInvalidPacket, "serving incoming packet %x", int(pktType))
 		}
 	}
 }

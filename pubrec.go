@@ -20,10 +20,10 @@ type pktPubRec struct {
 
 func (p *pktPubRec) parse(flag byte, contents []byte) (*pktPubRec, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing PUBREC")
 	}
 	if len(contents) < 2 {
-		return nil, ErrInvalidPacketLength
+		return nil, wrapError(ErrInvalidPacketLength, "parsing PUBREC")
 	}
 	_, p.ID = unpackUint16(contents)
 	return p, nil
