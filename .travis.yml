@@ -20,6 +20,8 @@ before_install:
 install:
   - go mod download
   - go build ./...
+  - go mod tidy
+  - (cd paho && go mod download && go build ./... && go mod tidy)
 
 before_script:
   - docker-compose up -d
@@ -38,6 +40,7 @@ script:
       -v \
       -tags integration \
       -race -coverprofile=coverage.txt -covermode=atomic)
+  - git diff --exit-code --quiet $(find . -name "go.*")  # mod/sum must be up-to-date and tidied
 
 after_script:
   - docker-compose down
