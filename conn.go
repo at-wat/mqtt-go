@@ -74,6 +74,7 @@ type DialOption func(*DialOptions) error
 type DialOptions struct {
 	Dialer    *net.Dialer
 	TLSConfig *tls.Config
+	ConnState func(ConnState, error)
 }
 
 // WithDialer sets dialer.
@@ -92,8 +93,18 @@ func WithTLSConfig(config *tls.Config) DialOption {
 	}
 }
 
+// WithConnStateHandler sets connection state change handler.
+func WithConnStateHandler(handler func(ConnState, error)) DialOption {
+	return func(o *DialOptions) error {
+		o.ConnState = handler
+		return nil
+	}
+}
+
 func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
-	c := &BaseClient{}
+	c := &BaseClient{
+		ConnState: d.ConnState,
+	}
 
 	u, err := url.Parse(urlStr)
 	if err != nil {
