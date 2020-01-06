@@ -134,20 +134,22 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for _, qos := range []QoS{QoS0, QoS1, QoS2} {
 				t.Run(fmt.Sprintf("QoS%d", int(qos)), func(t *testing.T) {
-					cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					chReceived := make(chan *Message, 100)
+
+					cli, err := Dial(url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+						WithConnStateHandler(
+							func(s ConnState, err error) {
+								switch s {
+								case StateClosed:
+									close(chReceived)
+									t.Errorf("Connection is expected to be disconnected, but closed.")
+								}
+							},
+						),
+					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
-					}
-
-					chReceived := make(chan *Message, 100)
-					cli.ConnState = func(s ConnState, err error) {
-						switch s {
-						case StateActive:
-						case StateClosed:
-							close(chReceived)
-							t.Errorf("Connection is expected to be disconnected, but closed.")
-						case StateDisconnected:
-						}
 					}
 
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -254,19 +256,21 @@ func TestIntegration_Ping(t *testing.T) {
 func BenchmarkPublishSubscribe(b *testing.B) {
 	for name, url := range urls {
 		b.Run(name, func(b *testing.B) {
-			cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			chReceived := make(chan *Message, 100)
+
+			cli, err := Dial(url,
+				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+				WithConnStateHandler(
+					func(s ConnState, err error) {
+						switch s {
+						case StateClosed:
+							close(chReceived)
+						}
+					},
+				),
+			)
 			if err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
-			}
-
-			chReceived := make(chan *Message, 100)
-			cli.ConnState = func(s ConnState, err error) {
-				switch s {
-				case StateActive:
-				case StateClosed:
-					close(chReceived)
-				case StateDisconnected:
-				}
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
