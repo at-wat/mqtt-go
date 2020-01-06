@@ -52,28 +52,16 @@ func main() {
 
 	cli, err := mqtt.NewReconnectClient(
 		// Dialer to connect/reconnect to the server.
-		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
-			cli, err := mqtt.Dial(
-				fmt.Sprintf("mqtts://%s:8883", host),
+		&mqtt.URLDialer{
+			URL: fmt.Sprintf("mqtts://%s:8883", host),
+			Options: []mqtt.DialOption{
 				mqtt.WithTLSConfig(tlsConfig),
-			)
-			if err != nil {
-				return nil, err
-			}
-			// Register ConnState callback to low level client
-			cli.ConnState = func(s mqtt.ConnState, err error) {
-				fmt.Printf("State changed to %s (err: %v)\n", s, err)
-			}
-			return cli, nil
-		}),
-		// If you don't need customized (with state callback) low layer client,
-		// just use mqtt.URLDialer:
-		// &mqtt.URLDialer{
-		//   URL: fmt.Sprintf("mqtts://%s:8883", host),
-		//   Options: []mqtt.DialOption{
-		//     mqtt.WithTLSConfig(tlsConfig),
-		//   },
-		// },
+				mqtt.WithConnStateHandler(func(s mqtt.ConnState, err error) {
+					// Register ConnState callback to low level client
+					fmt.Printf("State changed to %s (err: %v)\n", s, err)
+				}),
+			},
+		},
 		mqtt.WithPingInterval(10*time.Second),
 		mqtt.WithTimeout(5*time.Second),
 		mqtt.WithReconnectWait(1*time.Second, 15*time.Second),

@@ -44,17 +44,12 @@ func main() {
 				host, time.Now().UnixNano(),
 			)
 			println("New URL:", url)
-			cli, err := mqtt.Dial(url,
+			return mqtt.Dial(url,
 				mqtt.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+				mqtt.WithConnStateHandler(func(s mqtt.ConnState, err error) {
+					fmt.Printf("State changed to %s (err: %v)\n", s, err)
+				}),
 			)
-			if err != nil {
-				return nil, err
-			}
-			// Register ConnState callback to low level client
-			cli.ConnState = func(s mqtt.ConnState, err error) {
-				fmt.Printf("State changed to %s (err: %v)\n", s, err)
-			}
-			return cli, nil
 		}),
 		mqtt.WithPingInterval(10*time.Second),
 		mqtt.WithTimeout(5*time.Second),
