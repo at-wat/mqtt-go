@@ -138,15 +138,13 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 
 					cli, err := Dial(url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
-						WithConnStateHandler(
-							func(s ConnState, err error) {
-								switch s {
-								case StateClosed:
-									close(chReceived)
-									t.Errorf("Connection is expected to be disconnected, but closed.")
-								}
-							},
-						),
+						WithConnStateHandler(func(s ConnState, err error) {
+							switch s {
+							case StateClosed:
+								close(chReceived)
+								t.Errorf("Connection is expected to be disconnected, but closed.")
+							}
+						}),
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -260,14 +258,12 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 
 			cli, err := Dial(url,
 				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
-				WithConnStateHandler(
-					func(s ConnState, err error) {
-						switch s {
-						case StateClosed:
-							close(chReceived)
-						}
-					},
-				),
+				WithConnStateHandler(func(s ConnState, err error) {
+					switch s {
+					case StateClosed:
+						close(chReceived)
+					}
+				}),
 			)
 			if err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
