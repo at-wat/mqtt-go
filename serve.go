@@ -47,7 +47,7 @@ func (c *BaseClient) serve() error {
 
 		switch pktType {
 		case packetConnAck:
-			connAck, err := (&pktConnAck{}).parse(pktFlag, contents)
+			connAck, err := (&pktConnAck{}).Parse(pktFlag, contents)
 			if err != nil {
 				// Client must close connection if packet is invalid.
 				return err
@@ -57,7 +57,7 @@ func (c *BaseClient) serve() error {
 			default:
 			}
 		case packetPublish:
-			publish, err := (&pktPublish{}).parse(pktFlag, contents)
+			publish, err := (&pktPublish{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ func (c *BaseClient) serve() error {
 				subBuffer[publish.Message.ID] = publish.Message
 			}
 		case packetPubAck:
-			pubAck, err := (&pktPubAck{}).parse(pktFlag, contents)
+			pubAck, err := (&pktPubAck{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -100,7 +100,7 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPubRec:
-			pubRec, err := (&pktPubRec{}).parse(pktFlag, contents)
+			pubRec, err := (&pktPubRec{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -111,7 +111,7 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPubRel:
-			pubRel, err := (&pktPubRel{}).parse(pktFlag, contents)
+			pubRel, err := (&pktPubRel{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -131,7 +131,7 @@ func (c *BaseClient) serve() error {
 				return wrapError(err, "sending PUBCOMP")
 			}
 		case packetPubComp:
-			pubComp, err := (&pktPubComp{}).parse(pktFlag, contents)
+			pubComp, err := (&pktPubComp{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -142,7 +142,7 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetSubAck:
-			subAck, err := (&pktSubAck{}).parse(pktFlag, contents)
+			subAck, err := (&pktSubAck{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -153,7 +153,7 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetUnsubAck:
-			unsubAck, err := (&pktUnsubAck{}).parse(pktFlag, contents)
+			unsubAck, err := (&pktUnsubAck{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}
@@ -164,7 +164,7 @@ func (c *BaseClient) serve() error {
 				}
 			}
 		case packetPingResp:
-			pingResp, err := (&pktPingResp{}).parse(pktFlag, contents)
+			pingResp, err := (&pktPingResp{}).Parse(pktFlag, contents)
 			if err != nil {
 				return err
 			}

@@ -35,7 +35,7 @@ func TestPublish_ParseError(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		_, err := (&pktPublish{}).parse(c.flag, c.contents)
+		_, err := (&pktPublish{}).Parse(c.flag, c.contents)
 		if !errs.Is(err, c.err) {
 			t.Errorf("Parsing packet with flag=%x, contents=%v expected error: %v, got: %v",
 				c.flag, c.contents,

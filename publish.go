@@ -33,7 +33,7 @@ type pktPublish struct {
 	Message *Message
 }
 
-func (p *pktPublish) parse(flag byte, contents []byte) (*pktPublish, error) {
+func (p *pktPublish) Parse(flag byte, contents []byte) (*pktPublish, error) {
 	p.Message = &Message{
 		Dup:    (publishFlag(flag) & publishFlagDup) != 0,
 		Retain: (publishFlag(flag) & publishFlagRetain) != 0,

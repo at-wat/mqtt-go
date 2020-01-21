@@ -54,7 +54,7 @@ type pktConnAck struct {
 	Code           ConnectionReturnCode
 }
 
-func (p *pktConnAck) parse(flag byte, contents []byte) (*pktConnAck, error) {
+func (p *pktConnAck) Parse(flag byte, contents []byte) (*pktConnAck, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing CONNACK")
 	}

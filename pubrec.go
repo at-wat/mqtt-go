@@ -18,7 +18,7 @@ type pktPubRec struct {
 	ID uint16
 }
 
-func (p *pktPubRec) parse(flag byte, contents []byte) (*pktPubRec, error) {
+func (p *pktPubRec) Parse(flag byte, contents []byte) (*pktPubRec, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing PUBREC")
 	}

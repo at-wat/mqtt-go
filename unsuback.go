@@ -18,7 +18,7 @@ type pktUnsubAck struct {
 	ID uint16
 }
 
-func (p *pktUnsubAck) parse(flag byte, contents []byte) (*pktUnsubAck, error) {
+func (p *pktUnsubAck) Parse(flag byte, contents []byte) (*pktUnsubAck, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing SUBACK")
 	}
