@@ -16,8 +16,11 @@ package mqtt
 
 import (
 	"bytes"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestRemainingLength(t *testing.T) {
@@ -47,5 +50,84 @@ func TestPacketType(t *testing.T) {
 		t.Errorf("Expected invlidPacketType.String(): Unknown..., got: %s",
 			packetType(0xFF).String(),
 		)
+	}
+}
+
+func TestPacketParseError(t *testing.T) {
+	cases := map[string]struct {
+		flag     byte
+		contents []byte
+		pkt      interface{}
+		err      error
+	}{
+		"ConnAck_InvalidFlag": {
+			0x01, []byte{}, &pktConnAck{}, ErrInvalidPacket,
+		},
+		"ConnAck_ShortLength": {
+			0x00, []byte{}, &pktConnAck{}, ErrInvalidPacketLength,
+		},
+		"PingResp_InvalidFlag": {
+			0x01, []byte{}, &pktPingResp{}, ErrInvalidPacket,
+		},
+		"PubAck_InvalidFlag": {
+			0x01, []byte{}, &pktPubAck{}, ErrInvalidPacket,
+		},
+		"PubAck_ShortLength": {
+			0x00, []byte{}, &pktPubAck{}, ErrInvalidPacketLength,
+		},
+		"PubComp_InvalidFlag": {
+			0x01, []byte{}, &pktPubComp{}, ErrInvalidPacket,
+		},
+		"PubComp_ShortLength": {
+			0x00, []byte{}, &pktPubComp{}, ErrInvalidPacketLength,
+		},
+		"Publish_InvalidQoS": {
+			0x06, []byte{}, &pktPublish{}, ErrInvalidPacket,
+		},
+		"Publish_ShortLength": {
+			0x02, []byte{}, &pktPublish{}, ErrInvalidPacketLength,
+		},
+		"PubRec_InvalidFlag": {
+			0x01, []byte{}, &pktPubRec{}, ErrInvalidPacket,
+		},
+		"PubRec_ShortLength": {
+			0x00, []byte{}, &pktPubRec{}, ErrInvalidPacketLength,
+		},
+		"PubRel_InvalidFlag": {
+			0x01, []byte{}, &pktPubRel{}, ErrInvalidPacket,
+		},
+		"PubRel_ShortLength": {
+			0x02, []byte{}, &pktPubRel{}, ErrInvalidPacketLength,
+		},
+		"SubAck_InvalidFlag": {
+			0x01, []byte{}, &pktSubAck{}, ErrInvalidPacket,
+		},
+		"UnsubAck_InvalidFlag": {
+			0x01, []byte{}, &pktUnsubAck{}, ErrInvalidPacket,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := reflect.ValueOf(c.pkt).MethodByName("Parse")
+			if !f.IsValid() {
+				t.Fatal("Packet struct doesn't have Parse method.")
+			}
+			ret := f.Call(
+				[]reflect.Value{
+					reflect.ValueOf(c.flag), reflect.ValueOf(c.contents),
+				},
+			)
+			if len(ret) != 2 {
+				t.Fatal("Invalid number of the return value of the Parse method.")
+			}
+			err, ok := ret[1].Interface().(error)
+			if !ok {
+				t.Fatal("Second return value of Parse is not error.")
+			}
+			if !errs.Is(err, c.err) {
+				t.Errorf("Parse result is expected to be: %v, got: %v", c.err, err)
+			}
+		})
 	}
 }

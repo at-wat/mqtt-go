@@ -18,7 +18,7 @@ type pktPubComp struct {
 	ID uint16
 }
 
-func (p *pktPubComp) parse(flag byte, contents []byte) (*pktPubComp, error) {
+func (p *pktPubComp) Parse(flag byte, contents []byte) (*pktPubComp, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing PUBCOMP")
 	}

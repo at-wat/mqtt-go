@@ -19,7 +19,7 @@ type pktSubAck struct {
 	Codes []subscribeFlag
 }
 
-func (p *pktSubAck) parse(flag byte, contents []byte) (*pktSubAck, error) {
+func (p *pktSubAck) Parse(flag byte, contents []byte) (*pktSubAck, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing SUBSCK")
 	}

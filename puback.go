@@ -18,7 +18,7 @@ type pktPubAck struct {
 	ID uint16
 }
 
-func (p *pktPubAck) parse(flag byte, contents []byte) (*pktPubAck, error) {
+func (p *pktPubAck) Parse(flag byte, contents []byte) (*pktPubAck, error) {
 	if flag != 0 {
 		return nil, wrapError(ErrInvalidPacket, "parsing PUBACK")
 	}
