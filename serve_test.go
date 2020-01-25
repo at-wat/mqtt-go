@@ -96,6 +96,7 @@ func TestServeParseError(t *testing.T) {
 		"InvalidPubRel":   {[]byte{0x61, 0x00}, ErrInvalidPacket},
 		"InvalidPubComp":  {[]byte{0x71, 0x00}, ErrInvalidPacket},
 		"InvalidSubAck":   {[]byte{0x91, 0x00}, ErrInvalidPacket},
+		"InvalidUnsubAck": {[]byte{0xB1, 0x00}, ErrInvalidPacket},
 		"InvalidPingResp": {[]byte{0xD1, 0x00}, ErrInvalidPacket},
 	}
 
