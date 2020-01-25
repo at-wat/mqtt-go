@@ -54,5 +54,4 @@ func TestIntegration_KeepAlive(t *testing.T) {
 			}
 		})
 	}
-
 }

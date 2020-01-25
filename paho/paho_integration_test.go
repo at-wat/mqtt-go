@@ -86,3 +86,27 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_KeepAlive(t *testing.T) {
+	opts := paho.NewClientOptions()
+	server, err := url.Parse("mqtt://localhost:1883")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	opts.Servers = []*url.URL{server}
+	opts.ClientID = "PahoWrapperKeepAlive"
+	opts.KeepAlive = 1
+
+	cli := NewClient(opts)
+	token := cli.Connect()
+	if !token.WaitTimeout(5 * time.Second) {
+		t.Fatal("Connect timeout")
+	}
+
+	// Without keepalive, broker should disconnect on t=1.5s.
+	time.Sleep(3 * time.Second)
+
+	if !cli.IsConnected() {
+		t.Errorf("Connection is unexpectedly closed")
+	}
+}
