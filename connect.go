@@ -94,6 +94,14 @@ func (p *pktConnect) pack() []byte {
 	)
 }
 
+func (c *BaseClient) init() {
+	c.sig = &signaller{}
+	c.mu.Lock()
+	c.connClosed = make(chan struct{})
+	c.mu.Unlock()
+	c.initID()
+}
+
 // Connect to the broker.
 func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
 	o := &ConnectOptions{
@@ -104,13 +112,9 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 			return false, err
 		}
 	}
-	c.sig = &signaller{}
-	c.mu.Lock()
-	c.connClosed = make(chan struct{})
+	c.init()
 	c.muConnecting.Lock()
 	defer c.muConnecting.Unlock()
-	c.mu.Unlock()
-	c.initID()
 
 	go func() {
 		err := c.serve()
