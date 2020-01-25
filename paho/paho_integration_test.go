@@ -124,12 +124,15 @@ func TestIntegration_Will(t *testing.T) {
 
 	will := make(chan *mqtt.Message, 100)
 	cli0, err := mqtt.Dial("mqtt://localhost:1883")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
 	if _, err := cli0.Connect(ctx, "PahoWrapperWillTester"); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unexpected error: '%v'", err)
 	}
 	defer cli0.Disconnect(context.Background())
 	if err := cli0.Subscribe(ctx, mqtt.Subscription{Topic: "will", QoS: mqtt.QoS1}); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unexpected error: '%v'", err)
 	}
 	cli0.Handle(mqtt.HandlerFunc(func(msg *mqtt.Message) {
 		if msg.Topic == "will" {
