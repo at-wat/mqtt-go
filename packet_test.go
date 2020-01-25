@@ -17,6 +17,7 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"reflect"
 	"strings"
@@ -175,6 +176,36 @@ func TestPacketSendCancel(t *testing.T) {
 	t.Run("PublishQoS2", func(t *testing.T) {
 		if err := cli.Publish(ctx, &Message{QoS: QoS1}); err != context.Canceled {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
+		}
+	})
+}
+
+func TestPacketSendError(t *testing.T) {
+	ca, _ := net.Pipe()
+	cli := &BaseClient{Transport: ca}
+	cli.init()
+
+	ctx := context.Background()
+	ca.Close()
+
+	t.Run("Subscribe", func(t *testing.T) {
+		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errs.Is(err, io.ErrClosedPipe) {
+			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
+		}
+	})
+	t.Run("Unsubscribe", func(t *testing.T) {
+		if err := cli.Unsubscribe(ctx, "test"); !errs.Is(err, io.ErrClosedPipe) {
+			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
+		}
+	})
+	t.Run("PingReq", func(t *testing.T) {
+		if err := cli.Ping(ctx); !errs.Is(err, io.ErrClosedPipe) {
+			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
+		}
+	})
+	t.Run("Publish", func(t *testing.T) {
+		if err := cli.Publish(ctx, &Message{}); !errs.Is(err, io.ErrClosedPipe) {
+			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
 }
