@@ -19,6 +19,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestRemainingLengthParse(t *testing.T) {
@@ -79,5 +81,37 @@ func TestRemainingLengthParse(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Error("Timeout")
+	}
+}
+
+func TestServeParseError(t *testing.T) {
+	cases := map[string]struct {
+		input []byte
+		err   error
+	}{
+		"InvalidConnAck":  {[]byte{0x21, 0x00}, ErrInvalidPacket},
+		"InvalidPublish":  {[]byte{0x32, 0x00}, ErrInvalidPacketLength},
+		"InvalidPubAck":   {[]byte{0x41, 0x00}, ErrInvalidPacket},
+		"InvalidPubRec":   {[]byte{0x51, 0x00}, ErrInvalidPacket},
+		"InvalidPubRel":   {[]byte{0x61, 0x00}, ErrInvalidPacket},
+		"InvalidPubComp":  {[]byte{0x71, 0x00}, ErrInvalidPacket},
+		"InvalidSubAck":   {[]byte{0x91, 0x00}, ErrInvalidPacket},
+		"InvalidPingResp": {[]byte{0xD1, 0x00}, ErrInvalidPacket},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ca, cb := net.Pipe()
+			cli := &BaseClient{Transport: cb}
+
+			go func() {
+				if _, err := ca.Write(c.input); err != nil {
+					t.Fatalf("Unexpected error: '%v'", err)
+				}
+			}()
+			if err := cli.serve(); !errs.Is(err, c.err) {
+				t.Fatalf("Expected error: '%v', got: '%v'", c.err, err)
+			}
+		})
 	}
 }
