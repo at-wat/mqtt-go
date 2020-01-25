@@ -18,10 +18,12 @@ package mqtt
 
 import (
 	"bytes"
+	"context"
 	"net/url"
 	"testing"
 	"time"
 
+	"github.com/at-wat/mqtt-go"
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -113,5 +115,55 @@ func TestIntegration_KeepAlive(t *testing.T) {
 				t.Errorf("Connection is unexpectedly closed")
 			}
 		})
+	}
+}
+
+func TestIntegration_Will(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	will := make(chan *mqtt.Message, 100)
+	cli0, err := mqtt.Dial("mqtt://localhost:1883")
+	if _, err := cli0.Connect(ctx, "PahoWrapperWillTester"); err != nil {
+		t.Fatal(err)
+	}
+	defer cli0.Disconnect(context.Background())
+	if err := cli0.Subscribe(ctx, mqtt.Subscription{Topic: "will", QoS: mqtt.QoS1}); err != nil {
+		t.Fatal(err)
+	}
+	cli0.Handle(mqtt.HandlerFunc(func(msg *mqtt.Message) {
+		if msg.Topic == "will" {
+			will <- msg
+		}
+	}))
+
+	opts := paho.NewClientOptions()
+	server, err := url.Parse("mqtt://localhost:1883")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	opts.Servers = []*url.URL{server}
+	opts.ClientID = "PahoWrapperWill"
+	opts.WillEnabled = true
+	opts.WillTopic = "will"
+	opts.WillPayload = []byte("bye")
+	opts.WillQos = 1
+
+	cli := NewClient(opts)
+	token := cli.Connect()
+	if !token.WaitTimeout(5 * time.Second) {
+		t.Fatal("Connect timeout")
+	}
+
+	cli.(*pahoWrapper).cliCloser.Close()
+
+	select {
+	case msg := <-will:
+		if !bytes.Equal(msg.Payload, opts.WillPayload) {
+			t.Errorf("Expected will message: '%s', got: '%s'",
+				string(opts.WillPayload), string(msg.Payload))
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("Will is not sent")
 	}
 }
