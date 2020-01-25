@@ -18,6 +18,7 @@ package mqtt
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"time"
 
@@ -34,15 +35,34 @@ type pahoWrapper struct {
 	serveMux   *mqtt.ServeMux
 	pahoConfig *paho.ClientOptions
 	mu         sync.Mutex
+
+	// paho version dependent parameters
+	connectRetry         bool
+	connectRetryInterval time.Duration
+	maxReconnectInterval time.Duration
 }
 
 // NewClient creates paho.mqtt.golang interface wrapping at-wat/mqtt-go.
 // It's very experimental and some of the options are not supported.
 func NewClient(o *paho.ClientOptions) paho.Client {
 	w := &pahoWrapper{
-		pahoConfig: o,
-		serveMux:   &mqtt.ServeMux{},
+		pahoConfig:           o,
+		serveMux:             &mqtt.ServeMux{},
+		connectRetryInterval: time.Second,
+		maxReconnectInterval: 10 * time.Second,
 	}
+
+	conf := reflect.ValueOf(*o)
+	if v := conf.FieldByName("ConnectRetry"); v.IsValid() {
+		w.connectRetry = v.Bool()
+	}
+	if v := conf.FieldByName("ConnectRetryInterval"); v.IsValid() {
+		w.connectRetryInterval = v.Interface().(time.Duration)
+	}
+	if v := conf.FieldByName("MaxReconnectInterval"); v.IsValid() {
+		w.maxReconnectInterval = v.Interface().(time.Duration)
+	}
+
 	if len(o.Servers) != 1 {
 		panic("unsupported number of servers")
 	}
@@ -89,12 +109,12 @@ func (c *pahoWrapper) Connect() paho.Token {
 		}))
 	}
 	if c.pahoConfig.AutoReconnect {
-		return c.connectRetry(opts)
+		return c.connectWithRetry(opts)
 	}
 	return c.connectOnce(opts)
 }
 
-func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
+func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
 	token := newToken()
 	go func() {
 		pingInterval := time.Duration(c.pahoConfig.KeepAlive) * time.Second
@@ -126,10 +146,7 @@ func (c *pahoWrapper) connectRetry(opts []mqtt.ConnectOption) paho.Token {
 			}),
 			mqtt.WithPingInterval(pingInterval),
 			mqtt.WithTimeout(c.pahoConfig.PingTimeout),
-			mqtt.WithReconnectWait(
-				time.Second,    // c.pahoConfig.ConnectRetryInterval,
-				10*time.Second, // c.pahoConfig.MaxReconnectInterval,
-			),
+			mqtt.WithReconnectWait(c.connectRetryInterval, c.maxReconnectInterval),
 		)
 		if err != nil {
 			token.err = err
@@ -160,10 +177,10 @@ func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
 				mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
 			)
 			if err != nil {
-				// if c.pahoConfig.ConnectRetry {
-				//   time.Sleep(c.pahoConfig.ConnectRetryInterval)
-				//   continue
-				// }
+				if c.connectRetry {
+					time.Sleep(c.connectRetryInterval)
+					continue
+				}
 				token.err = err
 				token.release()
 				return
