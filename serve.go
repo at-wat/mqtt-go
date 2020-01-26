@@ -18,29 +18,37 @@ import (
 	"io"
 )
 
+func readPacket(r io.Reader) (packetType, byte, []byte, error) {
+	pktTypeBytes := make([]byte, 1)
+	if _, err := io.ReadFull(r, pktTypeBytes); err != nil {
+		return 0, 0, nil, err
+	}
+	pktType := packetType(pktTypeBytes[0] & 0xF0)
+	pktFlag := pktTypeBytes[0] & 0x0F
+	var remainingLength int
+	for shift := uint(0); ; shift += 7 {
+		b := make([]byte, 1)
+		if _, err := io.ReadFull(r, b); err != nil {
+			return 0, 0, nil, err
+		}
+		remainingLength |= (int(b[0]) & 0x7F) << shift
+		if !(b[0]&0x80 != 0) {
+			break
+		}
+	}
+	contents := make([]byte, remainingLength)
+	if _, err := io.ReadFull(r, contents); err != nil {
+		return 0, 0, nil, err
+	}
+	return pktType, pktFlag, contents, nil
+}
+
 func (c *BaseClient) serve() error {
 	r := c.Transport
 	subBuffer := make(map[uint16]*Message)
 	for {
-		pktTypeBytes := make([]byte, 1)
-		if _, err := io.ReadFull(r, pktTypeBytes); err != nil {
-			return err
-		}
-		pktType := packetType(pktTypeBytes[0] & 0xF0)
-		pktFlag := pktTypeBytes[0] & 0x0F
-		var remainingLength int
-		for shift := uint(0); ; shift += 7 {
-			b := make([]byte, 1)
-			if _, err := io.ReadFull(r, b); err != nil {
-				return err
-			}
-			remainingLength |= (int(b[0]) & 0x7F) << shift
-			if !(b[0]&0x80 != 0) {
-				break
-			}
-		}
-		contents := make([]byte, remainingLength)
-		if _, err := io.ReadFull(r, contents); err != nil {
+		pktType, pktFlag, contents, err := readPacket(r)
+		if err != nil {
 			return err
 		}
 		// fmt.Printf("%s: %v\n", pktType, contents)
