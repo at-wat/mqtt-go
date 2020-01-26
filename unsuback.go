@@ -20,7 +20,10 @@ type pktUnsubAck struct {
 
 func (p *pktUnsubAck) Parse(flag byte, contents []byte) (*pktUnsubAck, error) {
 	if flag != 0 {
-		return nil, wrapError(ErrInvalidPacket, "parsing SUBACK")
+		return nil, wrapError(ErrInvalidPacket, "parsing UNSUBACK")
+	}
+	if len(contents) < 2 {
+		return nil, wrapError(ErrInvalidPacketLength, "parsing UNSUBACK")
 	}
 	p.ID = uint16(contents[0])<<8 | uint16(contents[1])
 	return p, nil

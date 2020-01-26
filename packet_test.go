@@ -110,6 +110,9 @@ func TestPacketParseError(t *testing.T) {
 		"UnsubAck_InvalidFlag": {
 			0x01, []byte{}, &pktUnsubAck{}, ErrInvalidPacket,
 		},
+		"UnsubAck_ShortLength": {
+			0x00, []byte{}, &pktUnsubAck{}, ErrInvalidPacketLength,
+		},
 	}
 
 	for name, c := range cases {
