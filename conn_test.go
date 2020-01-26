@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestDialOptionError(t *testing.T) {
@@ -40,5 +42,17 @@ func TestDialOption_WithDialer(t *testing.T) {
 		WithDialer(&net.Dialer{Timeout: time.Nanosecond}),
 	); !strings.Contains(err.Error(), "timeout") {
 		t.Errorf("Expected timeout error, got: '%v'", err)
+	}
+}
+
+func TestDial_UnsupportedProtocol(t *testing.T) {
+	if _, err := Dial("unknown://localhost:1884"); !errs.Is(err, ErrUnsupportedProtocol) {
+		t.Errorf("Expected error: '%v', got: '%v'", ErrUnsupportedProtocol, err)
+	}
+}
+
+func TestDial_InvalidURL(t *testing.T) {
+	if _, err := Dial("://localhost"); !strings.Contains(err.Error(), "missing protocol scheme") {
+		t.Errorf("Expected error: 'missing protocol scheme', got: '%v'", err)
 	}
 }
