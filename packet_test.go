@@ -17,11 +17,13 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/at-wat/mqtt-go/internal/errs"
 )
@@ -208,4 +210,99 @@ func TestPacketSendError(t *testing.T) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
+}
+
+func TestConnectionError(t *testing.T) {
+	resps := [][]byte{
+		{0x20, 0x02, 0x00, 0x00},
+		{0x90, 0x03, 0x00, 0x01, 0x00},
+		{0xB0, 0x02, 0x00, 0x02},
+		{0xD0, 0x00},
+		{},
+		{0x40, 0x02, 0x00, 0x04},
+		{0x50, 0x02, 0x00, 0x05},
+		{0x70, 0x02, 0x00, 0x05},
+		{},
+	}
+	reqs := []func(ctx context.Context, cli *BaseClient) error{
+		func(ctx context.Context, cli *BaseClient) error {
+			_, err := cli.Connect(ctx, "cli")
+			cli.idLast = 0
+			return err
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Subscribe(ctx, Subscription{Topic: "test"})
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Unsubscribe(ctx, "test")
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Ping(ctx)
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Publish(ctx, &Message{QoS: QoS0})
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Publish(ctx, &Message{QoS: QoS1})
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Publish(ctx, &Message{QoS: QoS2})
+		},
+		func(ctx context.Context, cli *BaseClient) error {
+			return cli.Disconnect(ctx)
+		},
+	}
+
+	cases := []struct {
+		closeAt int
+		errorAt int
+	}{
+		{0, 0}, // CONNECT
+		{1, 1}, // SUBSCRIBE
+		{2, 2}, // UNSUBSCRIBE
+		{3, 3}, // PINGREQ
+		{4, 4}, // PUBLISH QoS0
+		{5, 5}, // PUBLISH QoS1
+		{6, 6}, // PUBLISH QoS2 PUBREC
+		{7, 6}, // PUBLISH QoS2 PUBCOMP
+		{8, 7}, // DISCONNECT
+	}
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("CloseAt%dErrorAt%d", c.closeAt, c.errorAt), func(t *testing.T) {
+			ca, cb := net.Pipe()
+			cli := &BaseClient{Transport: ca}
+
+			go func() {
+				defer cb.Close()
+				for i, resp := range resps {
+					if i == c.closeAt {
+						return
+					}
+					if _, _, _, err := readPacket(cb); err != nil {
+						t.Errorf("Unexpected error: %v", err)
+						return
+					}
+					if len(resp) > 0 {
+						io.Copy(cb, bytes.NewReader(resp))
+					}
+				}
+			}()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			for i, req := range reqs {
+				err := req(ctx, cli)
+				if i == c.errorAt {
+					if !errs.Is(err, io.ErrClosedPipe) {
+						t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
+					}
+					break
+				} else {
+					if err != nil {
+						t.Errorf("Unexpected error: %v", err)
+					}
+				}
+			}
+		})
+	}
 }
