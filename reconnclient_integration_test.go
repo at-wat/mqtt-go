@@ -231,7 +231,7 @@ func newOnOffFilter(sw *int32) func([]byte) bool {
 	}
 }
 
-func TestIntegration_ReconnectClient_Retry(t *testing.T) {
+func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -245,7 +245,7 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 			if _, err = cliRecv.Connect(ctx,
-				"RetryRecvClient"+name,
+				"RetryRecvClientPub"+name,
 			); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
@@ -295,13 +295,7 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			cli.Connect(
-				ctx,
-				"RetryClient"+name,
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+			cli.Connect(ctx, "RetryClientPub"+name)
 
 			select {
 			case <-ctx.Done():
@@ -359,6 +353,172 @@ func TestIntegration_ReconnectClient_Retry(t *testing.T) {
 			if len(received) != 10 {
 				t.Errorf("Messages lost on retry, sent: 10, got: %d\n%v", len(received), received)
 			}
+		})
+	}
+}
+
+func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			cliSend, err := Dial(
+				url,
+				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			if _, err = cliSend.Connect(ctx,
+				"RetrySendClientSub"+name,
+			); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			var sw int32
+			chConnected := make(chan struct{}, 1)
+
+			cli, err := NewReconnectClient(
+				DialerFunc(func() (ClientCloser, error) {
+					cli, err := Dial(url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						return nil, err
+					}
+					ca, cb := filteredpipe.DetectAndClosePipe(
+						newOnOffFilter(&sw),
+						newOnOffFilter(&sw),
+					)
+					filteredpipe.Connect(ca, cli.Transport)
+					cli.Transport = cb
+					cli.ConnState = func(s ConnState, err error) {
+						if s == StateActive {
+							chConnected <- struct{}{}
+						}
+					}
+					return cli, nil
+				}),
+				WithPingInterval(250*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
+				WithReconnectWait(200*time.Millisecond, time.Second),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			received := make(map[byte]bool)
+			var mu sync.Mutex
+			cli.Handle(HandlerFunc(func(msg *Message) {
+				mu.Lock()
+				defer mu.Unlock()
+				received[msg.Payload[0]] = true
+			}))
+
+			cli.Connect(ctx, "RetryClientSub"+name)
+
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+
+			// Disconnect
+			atomic.StoreInt32(&sw, 1)
+			// Try subscribe
+			cli.Subscribe(ctx, Subscription{Topic: "test/RetrySub" + name, QoS: QoS1})
+			time.Sleep(10 * time.Millisecond)
+			// Connect
+			atomic.StoreInt32(&sw, 0)
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+
+			if err := cliSend.Publish(ctx, &Message{
+				Topic:   "test/RetrySub" + name,
+				QoS:     QoS0,
+				Retain:  false,
+				Payload: []byte{0},
+			}); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			// Disconnect
+			atomic.StoreInt32(&sw, 1)
+			// Try unsubscribe
+			cli.Unsubscribe(ctx, "test/RetrySub"+name)
+			time.Sleep(10 * time.Millisecond)
+			// Connect
+			atomic.StoreInt32(&sw, 0)
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+
+			if err := cliSend.Publish(ctx, &Message{
+				Topic:   "test/RetrySub" + name,
+				QoS:     QoS0,
+				Retain:  false,
+				Payload: []byte{1},
+			}); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			cli.Disconnect(ctx)
+			cliSend.Disconnect(ctx)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(received) != 1 {
+				t.Errorf("Expected to receive one messages, got: %d\n%v", len(received), received)
+			}
+		})
+	}
+}
+
+func TestIntegration_ReconnectClient_Ping(t *testing.T) {
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			chConnected := make(chan struct{}, 1)
+			cli, err := NewReconnectClient(
+				&URLDialer{
+					URL: url,
+					Options: []DialOption{
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+						WithConnStateHandler(func(s ConnState, err error) {
+							if s == StateActive {
+								chConnected <- struct{}{}
+							}
+						}),
+					},
+				},
+				WithPingInterval(250*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
+				WithReconnectWait(200*time.Millisecond, time.Second),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			cli.Connect(ctx, "RetryClientPing"+name)
+
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Unexpected error: '%v'", ctx.Err())
+			case <-chConnected:
+			}
+
+			if err := cli.Ping(ctx); err != nil {
+				t.Errorf("Unexpected error: '%v'", err)
+			}
+			cli.Disconnect(ctx)
 		})
 	}
 }
