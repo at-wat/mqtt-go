@@ -427,7 +427,7 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			atomic.StoreInt32(&sw, 1)
 			// Try subscribe
 			cli.Subscribe(ctx, Subscription{Topic: "test/RetrySub" + name, QoS: QoS1})
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			// Connect
 			atomic.StoreInt32(&sw, 0)
 			select {
@@ -436,6 +436,7 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			case <-chConnected:
 			}
 
+			time.Sleep(50 * time.Millisecond)
 			if err := cliSend.Publish(ctx, &Message{
 				Topic:   "test/RetrySub" + name,
 				QoS:     QoS0,
@@ -444,13 +445,13 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 
 			// Disconnect
 			atomic.StoreInt32(&sw, 1)
 			// Try unsubscribe
 			cli.Unsubscribe(ctx, "test/RetrySub"+name)
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			// Connect
 			atomic.StoreInt32(&sw, 0)
 			select {
@@ -459,6 +460,7 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			case <-chConnected:
 			}
 
+			time.Sleep(50 * time.Millisecond)
 			if err := cliSend.Publish(ctx, &Message{
 				Topic:   "test/RetrySub" + name,
 				QoS:     QoS0,
@@ -467,7 +469,7 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 
 			cli.Disconnect(ctx)
 			cliSend.Disconnect(ctx)
