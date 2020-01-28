@@ -113,9 +113,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, sub
 		c.subQueue = append(c.subQueue, subs)
 		c.muQueue.Unlock()
 	} else {
-		c.muQueue.Lock()
-		c.subEstablished = append(c.subEstablished, subs...)
-		c.muQueue.Unlock()
+		c.appendEstablished(subs...)
 	}
 }
 
@@ -133,20 +131,30 @@ func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, t
 		c.unsubQueue = append(c.unsubQueue, topics)
 		c.muQueue.Unlock()
 	} else {
-		c.muQueue.Lock()
-		l := len(c.subEstablished)
-		for _, topic := range topics {
-			for i, e := range c.subEstablished {
-				if e.Topic == topic {
-					l--
-					c.subEstablished[i] = c.subEstablished[l]
-					break
-				}
+		c.removeEstablished(topics...)
+	}
+}
+
+func (c *RetryClient) appendEstablished(subs ...Subscription) {
+	c.muQueue.Lock()
+	c.subEstablished = append(c.subEstablished, subs...)
+	c.muQueue.Unlock()
+}
+
+func (c *RetryClient) removeEstablished(topics ...string) {
+	c.muQueue.Lock()
+	l := len(c.subEstablished)
+	for _, topic := range topics {
+		for i, e := range c.subEstablished {
+			if e.Topic == topic {
+				l--
+				c.subEstablished[i] = c.subEstablished[l]
+				break
 			}
 		}
-		c.subEstablished = c.subEstablished[:l]
-		c.muQueue.Unlock()
 	}
+	c.subEstablished = c.subEstablished[:l]
+	c.muQueue.Unlock()
 }
 
 // Disconnect from the broker.
