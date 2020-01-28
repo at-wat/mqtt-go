@@ -25,7 +25,8 @@ type RetryClient struct {
 
 	pubQueue       []*Message       // unacknoledged messages
 	subQueue       [][]Subscription // unacknoledged subscriptions
-	subEstablished [][]Subscription // acknoledged subscriptions
+	unsubQueue     [][]string       // unacknoledged unsubscriptions
+	subEstablished []Subscription   // acknoledged subscriptions
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
@@ -36,7 +37,9 @@ func (c *RetryClient) Handle(handler Handler) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handler = handler
-	c.Client.Handle(handler)
+	if c.Client != nil {
+		c.Client.Handle(handler)
+	}
 }
 
 // Publish tries to publish the message and immediately return nil.
@@ -59,6 +62,18 @@ func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error
 		cli := c.Client
 		c.mu.Unlock()
 		c.subscribe(ctx, false, cli, subs...)
+	}()
+	return nil
+}
+
+// Unsubscribe tries to unsubscribe the topic and immediately return nil.
+// If it is not acknowledged to be unsubscribed, the request will be queued.
+func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
+	go func() {
+		c.mu.Lock()
+		cli := c.Client
+		c.mu.Unlock()
+		c.unsubscribe(ctx, false, cli, topics...)
 	}()
 	return nil
 }
@@ -98,10 +113,48 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, sub
 		c.subQueue = append(c.subQueue, subs)
 		c.muQueue.Unlock()
 	} else {
-		c.muQueue.Lock()
-		c.subEstablished = append(c.subEstablished, subs)
-		c.muQueue.Unlock()
+		c.appendEstablished(subs...)
 	}
+}
+
+func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, topics ...string) {
+	if err := cli.Unsubscribe(ctx, topics...); err != nil {
+		select {
+		case <-ctx.Done():
+			if !retry {
+				// User cancelled; don't queue.
+				return
+			}
+		default:
+		}
+		c.muQueue.Lock()
+		c.unsubQueue = append(c.unsubQueue, topics)
+		c.muQueue.Unlock()
+	} else {
+		c.removeEstablished(topics...)
+	}
+}
+
+func (c *RetryClient) appendEstablished(subs ...Subscription) {
+	c.muQueue.Lock()
+	c.subEstablished = append(c.subEstablished, subs...)
+	c.muQueue.Unlock()
+}
+
+func (c *RetryClient) removeEstablished(topics ...string) {
+	c.muQueue.Lock()
+	l := len(c.subEstablished)
+	for _, topic := range topics {
+		for i, e := range c.subEstablished {
+			if e.Topic == topic {
+				l--
+				c.subEstablished[i] = c.subEstablished[l]
+				break
+			}
+		}
+	}
+	c.subEstablished = c.subEstablished[:l]
+	c.muQueue.Unlock()
 }
 
 // Disconnect from the broker.
@@ -110,14 +163,6 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 	cli := c.Client
 	c.mu.Unlock()
 	return cli.Disconnect(ctx)
-}
-
-// Unsubscribe topics.
-func (c *RetryClient) Unsubscribe(ctx context.Context, subs ...string) error {
-	c.mu.Lock()
-	cli := c.Client
-	c.mu.Unlock()
-	return cli.Unsubscribe(ctx, subs...)
 }
 
 // Ping to the broker.
@@ -151,7 +196,7 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 // Resubscribe subscribes all established subscriptions.
 func (c *RetryClient) Resubscribe(ctx context.Context) {
 	c.muQueue.Lock()
-	oldSubEstablished := append([][]Subscription{}, c.subEstablished...)
+	oldSubEstablished := append([]Subscription{}, c.subEstablished...)
 	c.subEstablished = nil
 	c.muQueue.Unlock()
 
@@ -160,7 +205,7 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 		cli := c.Client
 		c.mu.Unlock()
 		for _, sub := range oldSubEstablished {
-			c.subscribe(ctx, true, cli, sub...)
+			c.subscribe(ctx, true, cli, sub)
 		}
 	}
 }
@@ -174,14 +219,19 @@ func (c *RetryClient) Retry(ctx context.Context) {
 	c.muQueue.Lock()
 	oldPubQueue := append([]*Message{}, c.pubQueue...)
 	oldSubQueue := append([][]Subscription{}, c.subQueue...)
+	oldUnsubQueue := append([][]string{}, c.unsubQueue...)
 	c.pubQueue = nil
 	c.subQueue = nil
+	c.unsubQueue = nil
 	c.muQueue.Unlock()
 
 	// Retry publish.
 	go func() {
 		for _, sub := range oldSubQueue {
 			c.subscribe(ctx, true, cli, sub...)
+		}
+		for _, unsub := range oldUnsubQueue {
+			c.unsubscribe(ctx, true, cli, unsub...)
 		}
 		for _, msg := range oldPubQueue {
 			c.publish(ctx, true, cli, msg)
