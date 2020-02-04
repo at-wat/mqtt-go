@@ -28,64 +28,68 @@ import (
 )
 
 func TestIntegration_PublishSubscribe(t *testing.T) {
-	for name, recon := range map[string]bool{"Reconnect": true, "NoReconnect": false} {
-		t.Run(name, func(t *testing.T) {
-			opts := paho.NewClientOptions()
-			server, err := url.Parse("mqtt://localhost:1883")
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			opts.Servers = []*url.URL{server}
-			opts.AutoReconnect = recon
-			opts.ClientID = "PahoWrapper" + name
-			opts.KeepAlive = 0
+	for name0, recon := range map[string]bool{"Reconnect": true, "NoReconnect": false} {
+		for name1, order := range map[string]bool{"Sync": true, "Async": false} {
+			name := name0 + name1
+			t.Run(name, func(t *testing.T) {
+				opts := paho.NewClientOptions()
+				server, err := url.Parse("mqtt://localhost:1883")
+				if err != nil {
+					t.Fatalf("Unexpected error: '%v'", err)
+				}
+				opts.Servers = []*url.URL{server}
+				opts.AutoReconnect = recon
+				opts.ClientID = "PahoWrapper" + name
+				opts.KeepAlive = 0
+				opts.Order = order
 
-			cli := NewClient(opts)
-			token := cli.Connect()
-			if !token.WaitTimeout(5 * time.Second) {
-				t.Fatal("Connect timeout")
-			}
+				cli := NewClient(opts)
+				token := cli.Connect()
+				if !token.WaitTimeout(5 * time.Second) {
+					t.Fatal("Connect timeout")
+				}
 
-			msg := make(chan paho.Message, 100)
-			token = cli.Subscribe("paho"+name, 1, func(c paho.Client, m paho.Message) {
-				msg <- m
+				msg := make(chan paho.Message, 100)
+				token = cli.Subscribe("paho"+name, 1, func(c paho.Client, m paho.Message) {
+					msg <- m
+				})
+				if !token.WaitTimeout(5 * time.Second) {
+					t.Fatal("Subscribe timeout")
+				}
+				token = cli.Publish("paho"+name, 1, false, []byte{0x12})
+				if !token.WaitTimeout(5 * time.Second) {
+					t.Fatal("Publish timeout")
+				}
+
+				if !cli.IsConnected() {
+					t.Error("Not connected")
+				}
+				if !cli.IsConnectionOpen() {
+					t.Error("Not connection open")
+				}
+
+				select {
+				case m := <-msg:
+					if m.Topic() != "paho"+name {
+						t.Errorf("Expected topic: 'topic%s', got: %s", name, m.Topic())
+					}
+					if !bytes.Equal(m.Payload(), []byte{0x12}) {
+						t.Errorf("Expected payload: [18], got: %v", m.Payload())
+					}
+				case <-time.After(5 * time.Second):
+					t.Errorf("Message timeout")
+				}
+				cli.Disconnect(10)
+				time.Sleep(time.Second)
+
+				if cli.IsConnected() {
+					t.Error("Connected after disconnect")
+				}
+				if cli.IsConnectionOpen() {
+					t.Error("Connection open after disconnect")
+				}
 			})
-			if !token.WaitTimeout(5 * time.Second) {
-				t.Fatal("Subscribe timeout")
-			}
-			token = cli.Publish("paho"+name, 1, false, []byte{0x12})
-			if !token.WaitTimeout(5 * time.Second) {
-				t.Fatal("Publish timeout")
-			}
-
-			if !cli.IsConnected() {
-				t.Error("Not connected")
-			}
-			if !cli.IsConnectionOpen() {
-				t.Error("Not connection open")
-			}
-
-			select {
-			case m := <-msg:
-				if m.Topic() != "paho"+name {
-					t.Errorf("Expected topic: 'topic%s', got: %s", name, m.Topic())
-				}
-				if !bytes.Equal(m.Payload(), []byte{0x12}) {
-					t.Errorf("Expected payload: [18], got: %v", m.Payload())
-				}
-			case <-time.After(5 * time.Second):
-				t.Errorf("Message timeout")
-			}
-			cli.Disconnect(10)
-			time.Sleep(time.Second)
-
-			if cli.IsConnected() {
-				t.Error("Connected after disconnect")
-			}
-			if cli.IsConnectionOpen() {
-				t.Error("Connection open after disconnect")
-			}
-		})
+		}
 	}
 }
 

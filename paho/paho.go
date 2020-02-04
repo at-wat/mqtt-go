@@ -158,7 +158,11 @@ func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
 			token.release()
 			return
 		}
-		cli.Handle(c.serveMux)
+		if c.pahoConfig.Order {
+			cli.Handle(c.serveMux)
+		} else {
+			cli.Handle(&mqtt.ServeAsync{c.serveMux})
+		}
 		c.mu.Lock()
 		c.cli = cli
 		c.mu.Unlock()
@@ -197,7 +201,11 @@ func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
 					}
 				}
 			}
-			cli.Handle(c.serveMux)
+			if c.pahoConfig.Order {
+				cli.Handle(c.serveMux)
+			} else {
+				cli.Handle(&mqtt.ServeAsync{c.serveMux})
+			}
 			c.mu.Lock()
 			c.cli = cli
 			c.cliCloser = cli
