@@ -16,10 +16,12 @@ package mqtt
 
 // ServeAsync is a MQTT message handler to process messages asynchronously.
 type ServeAsync struct {
+	// Handler is an underlying handler.
+	// Handler.Serve() will be called asynchronously.
 	Handler
 }
 
-// Serve dispatches the message to the registered handlers.
+// Serve the message in a new goroutine.
 func (m *ServeAsync) Serve(message *Message) {
 	go m.Handler.Serve(message.clone())
 }
