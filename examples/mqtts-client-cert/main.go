@@ -86,8 +86,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := &mqtt.ServeMux{}
-	cli.Handle(mux) // Register muxer as a low level handler.
+	// mux := &mqtt.ServeAsync{Handler: &mqtt.ServeMux{}} // Async handler
+	mux := &mqtt.ServeMux{} // Sync handler
+	cli.Handle(mux)         // Register muxer as a low level handler.
 
 	mux.Handle("#", // Handle all topics by this handler.
 		mqtt.HandlerFunc(func(msg *mqtt.Message) {
