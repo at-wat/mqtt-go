@@ -19,21 +19,20 @@ import (
 )
 
 func readPacket(r io.Reader) (packetType, byte, []byte, error) {
-	pktTypeBytes := make([]byte, 1)
-	if _, err := io.ReadFull(r, pktTypeBytes); err != nil {
+	buf := make([]byte, 2)
+	if _, err := io.ReadFull(r, buf); err != nil {
 		return 0, 0, nil, err
 	}
-	pktType := packetType(pktTypeBytes[0] & 0xF0)
-	pktFlag := pktTypeBytes[0] & 0x0F
+	pktType := packetType(buf[0] & 0xF0)
+	pktFlag := buf[0] & 0x0F
 	var remainingLength int
 	for shift := uint(0); ; shift += 7 {
-		b := make([]byte, 1)
-		if _, err := io.ReadFull(r, b); err != nil {
-			return 0, 0, nil, err
-		}
-		remainingLength |= (int(b[0]) & 0x7F) << shift
-		if !(b[0]&0x80 != 0) {
+		remainingLength |= (int(buf[1]) & 0x7F) << shift
+		if !(buf[1]&0x80 != 0) {
 			break
+		}
+		if _, err := io.ReadFull(r, buf[1:]); err != nil {
+			return 0, 0, nil, err
 		}
 	}
 	contents := make([]byte, remainingLength)
