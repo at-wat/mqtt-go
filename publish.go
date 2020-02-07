@@ -68,7 +68,7 @@ func (p *pktPublish) Parse(flag byte, contents []byte) (*pktPublish, error) {
 	return p, nil
 }
 
-func (p *pktPublish) pack() []byte {
+func (p *pktPublish) Pack() []byte {
 	pktHeader := packetPublish.b()
 
 	if p.Message.Retain {
@@ -88,9 +88,10 @@ func (p *pktPublish) pack() []byte {
 		pktHeader |= byte(publishFlagDup)
 	}
 
-	header := packString(p.Message.Topic)
+	header := make([]byte, 0, packetBufferCap)
+	header = appendString(header, p.Message.Topic)
 	if p.Message.QoS != QoS0 {
-		header = append(header, packUint16(p.Message.ID)...)
+		header = appendUint16(header, p.Message.ID)
 	}
 
 	return pack(
@@ -137,7 +138,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		c.sig.mu.Unlock()
 	}
 
-	pkt := (&pktPublish{Message: message}).pack()
+	pkt := (&pktPublish{Message: message}).Pack()
 	if err := c.write(pkt); err != nil {
 		return wrapError(err, "sending PUBLISH")
 	}
@@ -158,7 +159,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 			return ctx.Err()
 		case <-chPubRec:
 		}
-		pktPubRel := (&pktPubRel{ID: message.ID}).pack()
+		pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
 		if err := c.write(pktPubRel); err != nil {
 			return wrapError(err, "sending PUBREL")
 		}

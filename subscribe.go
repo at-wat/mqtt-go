@@ -35,10 +35,10 @@ type pktSubscribe struct {
 	Subscriptions []Subscription
 }
 
-func (p *pktSubscribe) pack() []byte {
-	var payload []byte
+func (p *pktSubscribe) Pack() []byte {
+	payload := make([]byte, 0, packetBufferCap)
 	for _, sub := range p.Subscriptions {
-		payload = append(payload, packString(sub.Topic)...)
+		payload = appendString(payload, sub.Topic)
 
 		var flag byte
 		switch sub.QoS {
@@ -75,7 +75,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 	c.sig.chSubAck[id] = chSubAck
 	c.sig.mu.Unlock()
 
-	pkt := (&pktSubscribe{ID: id, Subscriptions: subs}).pack()
+	pkt := (&pktSubscribe{ID: id, Subscriptions: subs}).Pack()
 	if err := c.write(pkt); err != nil {
 		return wrapError(err, "sending SUBSCRIBE")
 	}

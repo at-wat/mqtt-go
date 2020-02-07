@@ -84,12 +84,12 @@ func (c *BaseClient) serve() error {
 				if handler != nil {
 					handler.Serve(publish.Message)
 				}
-				pktPubAck := (&pktPubAck{ID: publish.Message.ID}).pack()
+				pktPubAck := (&pktPubAck{ID: publish.Message.ID}).Pack()
 				if err := c.write(pktPubAck); err != nil {
 					return wrapError(err, "sending PUBACK")
 				}
 			case QoS2:
-				pktPubRec := (&pktPubRec{ID: publish.Message.ID}).pack()
+				pktPubRec := (&pktPubRec{ID: publish.Message.ID}).Pack()
 				if err := c.write(pktPubRec); err != nil {
 					return wrapError(err, "sending PUBREC")
 				}
@@ -133,7 +133,7 @@ func (c *BaseClient) serve() error {
 				delete(subBuffer, pubRel.ID)
 			}
 
-			pktPubComp := (&pktPubComp{ID: pubRel.ID}).pack()
+			pktPubComp := (&pktPubComp{ID: pubRel.ID}).Pack()
 			if err := c.write(pktPubComp); err != nil {
 				return wrapError(err, "sending PUBCOMP")
 			}

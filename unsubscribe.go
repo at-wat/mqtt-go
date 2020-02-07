@@ -23,10 +23,10 @@ type pktUnsubscribe struct {
 	Topics []string
 }
 
-func (p *pktUnsubscribe) pack() []byte {
-	var payload []byte
+func (p *pktUnsubscribe) Pack() []byte {
+	payload := make([]byte, 0, packetBufferCap)
 	for _, sub := range p.Topics {
-		payload = append(payload, packString(sub)...)
+		payload = appendString(payload, sub)
 	}
 
 	return pack(
@@ -51,7 +51,7 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	c.sig.chUnsubAck[id] = chUnsubAck
 	c.sig.mu.Unlock()
 
-	pkt := (&pktUnsubscribe{ID: id, Topics: subs}).pack()
+	pkt := (&pktUnsubscribe{ID: id, Topics: subs}).Pack()
 	if err := c.write(pkt); err != nil {
 		return wrapError(err, "sending UNSUBSCRIBE")
 	}

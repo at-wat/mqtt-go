@@ -29,7 +29,7 @@ func (p *pktPubRec) Parse(flag byte, contents []byte) (*pktPubRec, error) {
 	return p, nil
 }
 
-func (p *pktPubRec) pack() []byte {
+func (p *pktPubRec) Pack() []byte {
 	return pack(
 		packetPubRec.b(),
 		packUint16(p.ID),
