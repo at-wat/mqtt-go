@@ -36,9 +36,9 @@ type pktSubscribe struct {
 }
 
 func (p *pktSubscribe) Pack() []byte {
-	var payload []byte
+	payload := make([]byte, 0, packetBufferCap)
 	for _, sub := range p.Subscriptions {
-		payload = append(payload, packString(sub.Topic)...)
+		payload = appendString(payload, sub.Topic)
 
 		var flag byte
 		switch sub.QoS {

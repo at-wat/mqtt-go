@@ -52,7 +52,8 @@ type pktConnect struct {
 }
 
 func (p *pktConnect) Pack() []byte {
-	payload := packString(p.ClientID)
+	payload := make([]byte, 0, packetBufferCap)
+	payload = appendString(payload, p.ClientID)
 
 	var flag byte
 	if p.CleanSession {
@@ -71,16 +72,16 @@ func (p *pktConnect) Pack() []byte {
 		if p.Will.Retain {
 			flag |= byte(connectFlagWillRetain)
 		}
-		payload = append(payload, packString(p.Will.Topic)...)
-		payload = append(payload, packBytes(p.Will.Payload)...)
+		payload = appendString(payload, p.Will.Topic)
+		payload = appendBytes(payload, p.Will.Payload)
 	}
 	if p.UserName != "" {
 		flag |= byte(connectFlagUserName)
-		payload = append(payload, packString(p.UserName)...)
+		payload = appendString(payload, p.UserName)
 	}
 	if p.Password != "" {
 		flag |= byte(connectFlagPassword)
-		payload = append(payload, packString(p.Password)...)
+		payload = appendString(payload, p.Password)
 	}
 	return pack(
 		packetConnect.b(),

@@ -115,25 +115,38 @@ func remainingLength(n int) []byte {
 	panic("remaining length overflow")
 }
 
+func appendString(b []byte, s string) []byte {
+	return appendBytes(b, []byte(s))
+}
+
+func appendBytes(b, s []byte) []byte {
+	n := len(s)
+	if n > 0xFFFF {
+		panic("string length overflow")
+	}
+	b = appendUint16(b, uint16(n))
+	return append(b, s...)
+}
+
+func appendUint16(b []byte, v uint16) []byte {
+	return append(b,
+		byte(v>>8),
+		byte(v),
+	)
+}
+
 func packString(s string) []byte {
 	return packBytes([]byte(s))
 }
 
 func packBytes(s []byte) []byte {
-	n := len(s)
-	if n > 0xFFFF {
-		panic("string length overflow")
-	}
-	ret := packUint16(uint16(n))
-	ret = append(ret, s...)
-	return ret
+	ret := make([]byte, 0, len(s)+2)
+	return appendBytes(ret, s)
 }
 
 func packUint16(v uint16) []byte {
-	return []byte{
-		byte(v >> 8),
-		byte(v),
-	}
+	ret := make([]byte, 0, 2)
+	return appendUint16(ret, v)
 }
 
 func unpackUint16(b []byte) (int, uint16) {
@@ -158,3 +171,5 @@ func unpackString(b []byte) (int, string, error) {
 	}
 	return int(n) + nHeader, string(rs), nil
 }
+
+const packetBufferCap = 256

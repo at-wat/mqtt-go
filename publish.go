@@ -88,9 +88,10 @@ func (p *pktPublish) Pack() []byte {
 		pktHeader |= byte(publishFlagDup)
 	}
 
-	header := packString(p.Message.Topic)
+	header := make([]byte, 0, packetBufferCap)
+	header = appendString(header, p.Message.Topic)
 	if p.Message.QoS != QoS0 {
-		header = append(header, packUint16(p.Message.ID)...)
+		header = appendUint16(header, p.Message.ID)
 	}
 
 	return pack(

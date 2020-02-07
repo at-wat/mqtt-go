@@ -24,9 +24,9 @@ type pktUnsubscribe struct {
 }
 
 func (p *pktUnsubscribe) Pack() []byte {
-	var payload []byte
+	payload := make([]byte, 0, packetBufferCap)
 	for _, sub := range p.Topics {
-		payload = append(payload, packString(sub)...)
+		payload = appendString(payload, sub)
 	}
 
 	return pack(
