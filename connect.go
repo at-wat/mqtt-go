@@ -51,7 +51,7 @@ type pktConnect struct {
 	Will          *Message
 }
 
-func (p *pktConnect) pack() []byte {
+func (p *pktConnect) Pack() []byte {
 	payload := packString(p.ClientID)
 
 	var flag byte
@@ -143,7 +143,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		UserName:      o.UserName,
 		Password:      o.Password,
 		Will:          o.Will,
-	}).pack()
+	}).Pack()
 
 	if err := c.write(pkt); err != nil {
 		return false, wrapError(err, "sending CONNECT")

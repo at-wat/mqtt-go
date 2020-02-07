@@ -69,7 +69,7 @@ func TestRemainingLengthParse(t *testing.T) {
 
 	// Send PUBLISH from broker.
 	if _, err := ca.Write(
-		(&pktPublish{Message: &Message{Topic: "a", Payload: make([]byte, 256)}}).pack(),
+		(&pktPublish{Message: &Message{Topic: "a", Payload: make([]byte, 256)}}).Pack(),
 	); err != nil {
 		t.Fatalf("Unexpected error: ''%v''", err)
 	}

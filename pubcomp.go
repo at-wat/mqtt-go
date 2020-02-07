@@ -29,7 +29,7 @@ func (p *pktPubComp) Parse(flag byte, contents []byte) (*pktPubComp, error) {
 	return p, nil
 }
 
-func (p *pktPubComp) pack() []byte {
+func (p *pktPubComp) Pack() []byte {
 	return pack(
 		packetPubComp.b(),
 		packUint16(p.ID),

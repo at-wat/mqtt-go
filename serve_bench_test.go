@@ -12,7 +12,7 @@ func BenchmarkReadPacket(b *testing.B) {
 			data := (&pktPublish{Message: &Message{
 				Topic:   "topicString",
 				Payload: make([]byte, l),
-			}}).pack()
+			}}).Pack()
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
