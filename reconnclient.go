@@ -22,9 +22,10 @@ import (
 
 type reconnectClient struct {
 	*RetryClient
-	done    chan struct{}
-	options *ReconnectOptions
-	dialer  Dialer
+	done         chan struct{}
+	options      *ReconnectOptions
+	dialer       Dialer
+	disconnected chan struct{}
 }
 
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
@@ -39,10 +40,11 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) 
 		}
 	}
 	return &reconnectClient{
-		RetryClient: &RetryClient{},
-		done:        make(chan struct{}),
-		options:     options,
-		dialer:      dialer,
+		RetryClient:  &RetryClient{},
+		done:         make(chan struct{}),
+		disconnected: make(chan struct{}),
+		options:      options,
+		dialer:       dialer,
 	}, nil
 }
 
@@ -109,6 +111,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					case <-ctx.Done():
 						// User cancelled; don't restart.
 						return
+					case <-c.disconnected:
+						return
 					}
 				}
 				cancel()
@@ -117,6 +121,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 			case <-time.After(reconnWait):
 			case <-ctx.Done():
 				// User cancelled; don't restart.
+				return
+			case <-c.disconnected:
 				return
 			}
 			reconnWait *= 2
@@ -135,6 +141,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 
 // Disconnect from the broker.
 func (c *reconnectClient) Disconnect(ctx context.Context) error {
+	close(c.disconnected)
 	err := c.RetryClient.Disconnect(ctx)
 	select {
 	case <-c.done:
