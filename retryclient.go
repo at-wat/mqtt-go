@@ -21,7 +21,7 @@ import (
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	Client
+	Client // must be set via SetClient()
 
 	pubQueue       []*Message       // unacknoledged messages
 	subQueue       [][]Subscription // unacknoledged subscriptions
