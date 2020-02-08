@@ -30,7 +30,7 @@ type RetryClient struct {
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
-	chTask         chan func(cli *RetryClient)
+	chTask         chan func(cli Client)
 }
 
 // Handle registers the message handler.
@@ -46,24 +46,24 @@ func (c *RetryClient) Handle(handler Handler) {
 // Publish tries to publish the message and immediately return nil.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
-	return c.pushTask(ctx, func(cli *RetryClient) {
-		cli.publish(ctx, false, cli.cli, message)
+	return c.pushTask(ctx, func(cli Client) {
+		c.publish(ctx, false, cli, message)
 	})
 }
 
 // Subscribe tries to subscribe the topic and immediately return nil.
 // If it is not acknowledged to be subscribed, the request will be queued.
 func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	return c.pushTask(ctx, func(cli *RetryClient) {
-		cli.subscribe(ctx, false, cli.cli, subs...)
+	return c.pushTask(ctx, func(cli Client) {
+		c.subscribe(ctx, false, cli, subs...)
 	})
 }
 
 // Unsubscribe tries to unsubscribe the topic and immediately return nil.
 // If it is not acknowledged to be unsubscribed, the request will be queued.
 func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
-	return c.pushTask(ctx, func(cli *RetryClient) {
-		cli.unsubscribe(ctx, false, cli.cli, topics...)
+	return c.pushTask(ctx, func(cli Client) {
+		c.unsubscribe(ctx, false, cli, topics...)
 	})
 }
 
@@ -148,9 +148,9 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	return c.pushTask(ctx, func(cli *RetryClient) {
-		close(cli.chTask)
-		cli.cli.Disconnect(ctx)
+	return c.pushTask(ctx, func(cli Client) {
+		close(c.chTask)
+		cli.Disconnect(ctx)
 	})
 }
 
@@ -170,7 +170,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	c.cli = cli
 
 	if c.chTask == nil {
-		c.chTask = make(chan func(cli *RetryClient))
+		c.chTask = make(chan func(cli Client))
 	}
 
 	go func() {
@@ -186,7 +186,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	}()
 }
 
-func (c *RetryClient) pushTask(ctx context.Context, task func(cli *RetryClient)) error {
+func (c *RetryClient) pushTask(ctx context.Context, task func(cli Client)) error {
 	c.mu.Lock()
 	chTask := c.chTask
 	c.mu.Unlock()
