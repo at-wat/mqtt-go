@@ -28,7 +28,7 @@ func readPacket(r io.Reader) (packetType, byte, []byte, error) {
 	var remainingLength int
 	for shift := uint(0); ; shift += 7 {
 		remainingLength |= (int(buf[1]) & 0x7F) << shift
-		if !(buf[1]&0x80 != 0) {
+		if buf[1]&0x80 == 0 {
 			break
 		}
 		if _, err := io.ReadFull(r, buf[1:]); err != nil {
