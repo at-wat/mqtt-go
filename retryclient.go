@@ -176,19 +176,11 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 
 	c.chTask = make(chan func(cli Client))
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case task, ok := <-c.chTask:
-				if !ok {
-					return
-				}
-				c.mu.Lock()
-				cli := c.cli
-				c.mu.Unlock()
-				task(cli)
-			}
+		for task := range c.chTask {
+			c.mu.Lock()
+			cli := c.cli
+			c.mu.Unlock()
+			task(cli)
 		}
 	}()
 }
