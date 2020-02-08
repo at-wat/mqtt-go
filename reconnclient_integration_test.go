@@ -63,7 +63,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 
 			// Close underlying client.
 			time.Sleep(time.Millisecond)
-			cli.(*reconnectClient).Client.(ClientCloser).Close()
+			cli.(*reconnectClient).cli.(ClientCloser).Close()
 
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
