@@ -30,6 +30,8 @@ type RetryClient struct {
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
+	cancelTaskLoop func()
+	chTask         chan func(cli Client)
 }
 
 // Handle registers the message handler.
@@ -45,37 +47,25 @@ func (c *RetryClient) Handle(handler Handler) {
 // Publish tries to publish the message and immediately return nil.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
-	go func() {
-		c.mu.Lock()
-		cli := c.Client
-		c.mu.Unlock()
+	return c.pushTask(ctx, func(cli Client) {
 		c.publish(ctx, false, cli, message)
-	}()
-	return nil
+	})
 }
 
 // Subscribe tries to subscribe the topic and immediately return nil.
 // If it is not acknowledged to be subscribed, the request will be queued.
 func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	go func() {
-		c.mu.Lock()
-		cli := c.Client
-		c.mu.Unlock()
+	return c.pushTask(ctx, func(cli Client) {
 		c.subscribe(ctx, false, cli, subs...)
-	}()
-	return nil
+	})
 }
 
 // Unsubscribe tries to unsubscribe the topic and immediately return nil.
 // If it is not acknowledged to be unsubscribed, the request will be queued.
 func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
-	go func() {
-		c.mu.Lock()
-		cli := c.Client
-		c.mu.Unlock()
+	return c.pushTask(ctx, func(cli Client) {
 		c.unsubscribe(ctx, false, cli, topics...)
-	}()
-	return nil
+	})
 }
 
 func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, message *Message) {
@@ -161,6 +151,9 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 func (c *RetryClient) Disconnect(ctx context.Context) error {
 	c.mu.Lock()
 	cli := c.Client
+	if c.cancelTaskLoop != nil {
+		c.cancelTaskLoop()
+	}
 	c.mu.Unlock()
 	return cli.Disconnect(ctx)
 }
@@ -179,6 +172,38 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Client = cli
+
+	if c.chTask == nil {
+		c.chTask = make(chan func(cli Client))
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	if c.cancelTaskLoop != nil {
+		c.cancelTaskLoop()
+	}
+	c.cancelTaskLoop = cancel
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case task := <-c.chTask:
+				task(cli)
+			}
+		}
+	}()
+}
+
+func (c *RetryClient) pushTask(ctx context.Context, task func(cli Client)) error {
+	c.mu.Lock()
+	chTask := c.chTask
+	c.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case chTask <- task:
+	}
+	return nil
 }
 
 // Connect to the broker.
