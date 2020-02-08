@@ -15,7 +15,9 @@
 package mqtt
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -114,5 +116,26 @@ func TestServeParseError(t *testing.T) {
 				t.Fatalf("Expected error: '%v', got: '%v'", c.err, err)
 			}
 		})
+	}
+}
+
+func TestReadPacketError(t *testing.T) {
+	pkt := []byte{0x10, 0x80, 0x01}
+	pkt = append(pkt, make([]byte, 128)...)
+
+	// Ensure full packet doesn't error
+	_, _, _, err := readPacket(bytes.NewReader(pkt))
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	for i := 1; i < len(pkt)-1; i++ {
+		_, _, _, err := readPacket(bytes.NewReader(pkt[:i]))
+		if err != io.ErrUnexpectedEOF && err != io.EOF {
+			t.Fatalf(
+				"Expected error for %d: '%v' or %v'', got: '%v'",
+				i, io.ErrUnexpectedEOF, io.EOF, err,
+			)
+		}
 	}
 }
