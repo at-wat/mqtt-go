@@ -21,7 +21,7 @@ import (
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	Client // must be set via SetClient()
+	cli Client
 
 	pubQueue       []*Message       // unacknoledged messages
 	subQueue       [][]Subscription // unacknoledged subscriptions
@@ -39,8 +39,8 @@ func (c *RetryClient) Handle(handler Handler) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handler = handler
-	if c.Client != nil {
-		c.Client.Handle(handler)
+	if c.cli != nil {
+		c.cli.Handle(handler)
 	}
 }
 
@@ -150,7 +150,7 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
 	c.mu.Lock()
-	cli := c.Client
+	cli := c.cli
 	if c.cancelTaskLoop != nil {
 		c.cancelTaskLoop()
 	}
@@ -161,7 +161,7 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 // Ping to the broker.
 func (c *RetryClient) Ping(ctx context.Context) error {
 	c.mu.Lock()
-	cli := c.Client
+	cli := c.cli
 	c.mu.Unlock()
 	return cli.Ping(ctx)
 }
@@ -171,7 +171,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Client = cli
+	c.cli = cli
 
 	if c.chTask == nil {
 		c.chTask = make(chan func(cli Client))
@@ -209,7 +209,7 @@ func (c *RetryClient) pushTask(ctx context.Context, task func(cli Client)) error
 // Connect to the broker.
 func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error) {
 	c.mu.Lock()
-	cli := c.Client
+	cli := c.cli
 	cli.Handle(c.handler)
 	c.mu.Unlock()
 
@@ -227,7 +227,7 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 
 	if len(oldSubEstablished) > 0 {
 		c.mu.Lock()
-		cli := c.Client
+		cli := c.cli
 		c.mu.Unlock()
 		for _, sub := range oldSubEstablished {
 			c.subscribe(ctx, true, cli, sub)
@@ -238,7 +238,7 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 // Retry all queued publish/subscribe requests.
 func (c *RetryClient) Retry(ctx context.Context) {
 	c.mu.Lock()
-	cli := c.Client
+	cli := c.cli
 	c.mu.Unlock()
 
 	c.muQueue.Lock()
