@@ -122,6 +122,27 @@ func TestIntegration_KeepAlive(t *testing.T) {
 	}
 }
 
+func TestIntegration_ProtocolVersion(t *testing.T) {
+	opts := paho.NewClientOptions()
+	server, err := url.Parse("mqtt://localhost:1883")
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	opts.Servers = []*url.URL{server}
+	opts.AutoReconnect = false
+	opts.ClientID = "PahoWrapperProtocolVersion"
+	opts.ProtocolVersion = 4
+
+	cli := NewClient(opts)
+	token := cli.Connect()
+	if !token.WaitTimeout(5 * time.Second) {
+		t.Fatal("Connect timeout")
+	}
+	if !cli.IsConnected() {
+		t.Errorf("Connection is unexpectedly closed")
+	}
+}
+
 func TestIntegration_Will(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -172,5 +193,56 @@ func TestIntegration_Will(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("Will is not sent")
+	}
+}
+
+func TestIntegration_OnConnect(t *testing.T) {
+	for name, recon := range map[string]bool{"Reconnect": true, "NoReconnect": false} {
+		t.Run(name, func(t *testing.T) {
+			opts := paho.NewClientOptions()
+			server, err := url.Parse("mqtt://localhost:1883")
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			opts.Servers = []*url.URL{server}
+			opts.AutoReconnect = recon
+			opts.ClientID = "PahoWrapperOnConnect" + name
+
+			chConn := make(chan struct{}, 10)
+			chLost := make(chan struct{}, 10)
+			opts.OnConnect = func(paho.Client) {
+				chConn <- struct{}{}
+			}
+			opts.OnConnectionLost = func(paho.Client, error) {
+				chLost <- struct{}{}
+			}
+
+			cli := NewClient(opts)
+			token := cli.Connect()
+			if !token.WaitTimeout(5 * time.Second) {
+				t.Fatal("Connect timeout")
+			}
+			defer func() {
+				time.AfterFunc(5*time.Second, func() {
+					//panic("Disconnect timeout")
+				})
+				cli.Disconnect(0)
+			}()
+			select {
+			case <-chConn:
+			case <-chLost:
+				t.Fatal("OnConnectionLost called before OnConnect")
+			case <-time.After(time.Second):
+				t.Fatal("OnConnect didn't called")
+			}
+			cli.(*pahoWrapper).cliCloser.Close()
+			select {
+			case <-chConn:
+				t.Fatal("OnConnect called before OnConnectionLost")
+			case <-chLost:
+			case <-time.After(time.Second):
+				t.Fatal("OnConnectionLost didn't called")
+			}
+		})
 	}
 }
