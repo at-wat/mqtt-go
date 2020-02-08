@@ -39,14 +39,13 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) 
 			return nil, err
 		}
 	}
-	c := &reconnectClient{
+	return &reconnectClient{
 		RetryClient:  &RetryClient{},
 		done:         make(chan struct{}),
 		disconnected: make(chan struct{}),
 		options:      options,
 		dialer:       dialer,
-	}
-	return c, nil
+	}, nil
 }
 
 // Connect starts connection retry loop.

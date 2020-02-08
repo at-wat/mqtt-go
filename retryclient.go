@@ -148,10 +148,11 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	return c.pushTask(ctx, func(cli Client) {
-		close(c.chTask)
+	err := c.pushTask(ctx, func(cli Client) {
 		cli.Disconnect(ctx)
 	})
+	close(c.chTask)
+	return err
 }
 
 // Ping to the broker.
@@ -180,7 +181,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 				if !ok {
 					return
 				}
-				task(c)
+				task(cli)
 			}
 		}
 	}()
