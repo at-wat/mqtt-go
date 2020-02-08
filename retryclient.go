@@ -30,7 +30,6 @@ type RetryClient struct {
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
-	cancelTaskLoop func()
 	chTask         chan func(cli Client)
 }
 
@@ -149,13 +148,11 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	c.mu.Lock()
-	cli := c.cli
-	if c.cancelTaskLoop != nil {
-		c.cancelTaskLoop()
-	}
-	c.mu.Unlock()
-	return cli.Disconnect(ctx)
+	err := c.pushTask(ctx, func(cli Client) {
+		cli.Disconnect(ctx)
+	})
+	close(c.chTask)
+	return err
 }
 
 // Ping to the broker.
@@ -173,23 +170,17 @@ func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
 	defer c.mu.Unlock()
 	c.cli = cli
 
-	if c.chTask == nil {
-		c.chTask = make(chan func(cli Client))
+	if c.chTask != nil {
+		return
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	if c.cancelTaskLoop != nil {
-		c.cancelTaskLoop()
-	}
-	c.cancelTaskLoop = cancel
+	c.chTask = make(chan func(cli Client))
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case task := <-c.chTask:
-				task(cli)
-			}
+		for task := range c.chTask {
+			c.mu.Lock()
+			cli := c.cli
+			c.mu.Unlock()
+			task(cli)
 		}
 	}()
 }
