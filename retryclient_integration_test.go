@@ -54,5 +54,65 @@ func TestIntegration_RetryClient(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestIntegration_RetryClient_Cancel(t *testing.T) {
+	cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cliRecv, err := Dial(
+		urls["MQTT"],
+		WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	if _, err = cliRecv.Connect(ctx,
+		"RetryClientCancelRecv",
+	); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	chRecv := make(chan *Message)
+	cliRecv.Handle(HandlerFunc(func(msg *Message) {
+		chRecv <- msg
+	}))
+	if err := cliRecv.Subscribe(ctx, Subscription{Topic: "testCancel", QoS: QoS2}); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	var cli RetryClient
+	cli.SetClient(ctx, cliBase)
+
+	if _, err := cli.Connect(ctx, "RetryClientCancel"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx2, cancel2 := context.WithCancel(ctx)
+	if err := cli.Publish(ctx2, &Message{
+		Topic:   "testCancel",
+		QoS:     QoS2,
+		Payload: []byte("message"),
+	}); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	// Job must be already queued now.
+	cancel2()
+
+	select {
+	case <-chRecv:
+	case <-time.After(time.Second):
+		t.Error("Timeout")
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	if err := cliRecv.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
 }
