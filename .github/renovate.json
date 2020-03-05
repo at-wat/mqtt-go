@@ -8,7 +8,7 @@
   "packageRules": [
     {
       "packagePatterns": ["^golang.org/x/"],
-      "schedule": ["every weekend"]
+      "schedule": ["on the first day of the month"]
     }
   ]
 }
