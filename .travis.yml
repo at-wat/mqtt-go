@@ -9,6 +9,7 @@ branches:
 go:
   - "1.12"
   - "1.13"
+  - "1.14"
 env:
   global:
     - GO111MODULE=on
