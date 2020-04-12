@@ -278,6 +278,7 @@ func TestConnectionError(t *testing.T) {
 			go func() {
 				defer cb.Close()
 				for i, resp := range resps {
+					time.Sleep(10 * time.Millisecond)
 					if i == c.closeAt {
 						return
 					}
@@ -302,7 +303,7 @@ func TestConnectionError(t *testing.T) {
 					break
 				} else {
 					if err != nil {
-						t.Errorf("Unexpected error: %v", err)
+						t.Errorf("Unexpected error at %d: %v", i, err)
 					}
 				}
 			}
