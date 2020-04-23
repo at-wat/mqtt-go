@@ -16,8 +16,10 @@ package mqtt
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 
@@ -89,6 +91,31 @@ func WithDialer(dialer *net.Dialer) DialOption {
 func WithTLSConfig(config *tls.Config) DialOption {
 	return func(o *DialOptions) error {
 		o.TLSConfig = config
+		return nil
+	}
+}
+
+// WithTLSCertFiles loads certificate files
+func WithTLSCertFiles(host, caFile, certFile, privateKeyFile string) DialOption {
+	return func(o *DialOptions) error {
+		certpool := x509.NewCertPool()
+		cas, err := ioutil.ReadFile(caFile)
+		if err != nil {
+			return err
+		}
+		certpool.AppendCertsFromPEM(cas)
+
+		cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
+		if err != nil {
+			return err
+		}
+
+		if o.TLSConfig == nil {
+			o.TLSConfig = &tls.Config{}
+		}
+		o.TLSConfig.ServerName = host
+		o.TLSConfig.RootCAs = certpool
+		o.TLSConfig.Certificates = []tls.Certificate{cert}
 		return nil
 	}
 }
