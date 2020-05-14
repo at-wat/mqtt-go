@@ -29,9 +29,9 @@ func TestAppendRemoveEstablished(t *testing.T) {
 	)
 
 	expected1 := []Subscription{
-		Subscription{Topic: "t1", QoS: QoS1},
-		Subscription{Topic: "t2", QoS: QoS2},
-		Subscription{Topic: "t3", QoS: QoS0},
+		{Topic: "t1", QoS: QoS1},
+		{Topic: "t2", QoS: QoS2},
+		{Topic: "t3", QoS: QoS0},
 	}
 	if !reflect.DeepEqual(c.subEstablished, expected1) {
 		t.Errorf("Expected established topic list:\n%v\ngot:\n%v", expected1, c.subEstablished)
@@ -40,7 +40,7 @@ func TestAppendRemoveEstablished(t *testing.T) {
 	c.removeEstablished("t1", "t3")
 
 	expected2 := []Subscription{
-		Subscription{Topic: "t2", QoS: QoS2},
+		{Topic: "t2", QoS: QoS2},
 	}
 	if !reflect.DeepEqual(c.subEstablished, expected2) {
 		t.Errorf("Expected established topic list:\n%v\ngot:\n%v", expected2, c.subEstablished)
