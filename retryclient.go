@@ -21,7 +21,7 @@ import (
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	cli Client
+	cli ClientCloser
 
 	pubQueue       []*Message       // unacknoledged messages
 	subQueue       [][]Subscription // unacknoledged subscriptions
@@ -43,9 +43,14 @@ func (c *RetryClient) Handle(handler Handler) {
 	}
 }
 
-// Publish tries to publish the message and immediately return nil.
+// Publish tries to publish the message and immediately returns.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
+	if cli, ok := c.cli.(*BaseClient); ok {
+		if err := cli.ValidateMessage(message); err != nil {
+			return err
+		}
+	}
 	return c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		c.publish(ctx, false, cli, message)
 	})
@@ -165,7 +170,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 
 // SetClient sets the new Client.
 // Call Retry() and Resubscribe() to process queued messages and subscriptions.
-func (c *RetryClient) SetClient(ctx context.Context, cli Client) {
+func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.cli = cli

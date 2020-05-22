@@ -74,9 +74,10 @@ type DialOption func(*DialOptions) error
 
 // DialOptions stores options for Dial.
 type DialOptions struct {
-	Dialer    *net.Dialer
-	TLSConfig *tls.Config
-	ConnState func(ConnState, error)
+	Dialer        *net.Dialer
+	TLSConfig     *tls.Config
+	ConnState     func(ConnState, error)
+	MaxPayloadLen int
 }
 
 // WithDialer sets dialer.
@@ -120,6 +121,14 @@ func WithTLSCertFiles(host, caFile, certFile, privateKeyFile string) DialOption 
 	}
 }
 
+// WithMaxPayloadLen sets maximum payload length of the BaseClient.
+func WithMaxPayloadLen(l int) DialOption {
+	return func(o *DialOptions) error {
+		o.MaxPayloadLen = l
+		return nil
+	}
+}
+
 // WithConnStateHandler sets connection state change handler.
 func WithConnStateHandler(handler func(ConnState, error)) DialOption {
 	return func(o *DialOptions) error {
@@ -130,7 +139,8 @@ func WithConnStateHandler(handler func(ConnState, error)) DialOption {
 
 func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 	c := &BaseClient{
-		ConnState: d.ConnState,
+		ConnState:     d.ConnState,
+		MaxPayloadLen: d.MaxPayloadLen,
 	}
 
 	u, err := url.Parse(urlStr)
