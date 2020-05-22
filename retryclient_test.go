@@ -15,8 +15,11 @@
 package mqtt
 
 import (
+	"context"
 	"reflect"
 	"testing"
+
+	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestAppendRemoveEstablished(t *testing.T) {
@@ -44,5 +47,20 @@ func TestAppendRemoveEstablished(t *testing.T) {
 	}
 	if !reflect.DeepEqual(c.subEstablished, expected2) {
 		t.Errorf("Expected established topic list:\n%v\ngot:\n%v", expected2, c.subEstablished)
+	}
+}
+
+func TestRetryClientPublish_MessageValidationError(t *testing.T) {
+	cli := &RetryClient{
+		cli: &BaseClient{
+			MaxPayloadLen: 100,
+		},
+	}
+	if err := cli.Publish(context.Background(), &Message{
+		Payload: make([]byte, 101),
+	}); !errs.Is(err, ErrPayloadLenExceeded) {
+		t.Errorf("Publishing too large payload expected error: %v, got: %v",
+			ErrPayloadLenExceeded, err,
+		)
 	}
 }
