@@ -30,7 +30,11 @@ const (
 	publishFlagDup     publishFlag = 0x08
 )
 
+// ErrPayloadLenExceeded means the payload length is too large.
 var ErrPayloadLenExceeded = errors.New("payload length exceeded")
+
+// ErrInvalidQoS means the QoS value is not allowed.
+var ErrInvalidQoS = errors.New("invalid QoS")
 
 type pktPublish struct {
 	Message *Message
@@ -104,11 +108,22 @@ func (p *pktPublish) Pack() []byte {
 	)
 }
 
+// ValidateMessage validates given message.
+func (c *BaseClient) ValidateMessage(message *Message) error {
+	if c.MaxPayloadLen != 0 && len(message.Payload) >= c.MaxPayloadLen {
+		return wrapErrorf(ErrPayloadLenExceeded, "payload length %d", len(message.Payload))
+	}
+	if message.QoS > QoS2 {
+		return wrapErrorf(ErrInvalidQoS, "QoS%d", int(message.QoS))
+	}
+	return nil
+}
+
 // Publish a message to the broker.
 // ID field of the message is filled if zero.
 func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
-	if c.MaxPayloadLen != 0 && len(message.Payload) >= c.MaxPayloadLen {
-		return wrapErrorf(ErrPayloadLenExceeded, "payload length %d", len(message.Payload))
+	if err := c.ValidateMessage(message); err != nil {
+		return err
 	}
 
 	c.muConnecting.RLock()

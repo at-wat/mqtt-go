@@ -46,7 +46,7 @@ func TestPublish_ParseError(t *testing.T) {
 	}
 }
 
-func TestPublish_PayloadLengthValidation(t *testing.T) {
+func TestPublish_MessageValidation(t *testing.T) {
 	cli := &BaseClient{MaxPayloadLen: 100}
 
 	cases := []struct {
@@ -54,12 +54,15 @@ func TestPublish_PayloadLengthValidation(t *testing.T) {
 		err     error
 	}{
 		{&Message{Payload: make([]byte, 101)}, ErrPayloadLenExceeded},
+		{&Message{QoS: 3}, ErrInvalidQoS},
 	}
 
 	for _, c := range cases {
-		if err := cli.Publish(context.Background(), c.message); !errs.Is(err, ErrPayloadLenExceeded) {
-			t.Errorf("Publishing packet with payload length %d expected error: %v, got: %v",
-				len(c.message.Payload), c.err, err,
+		if err := cli.Publish(
+			context.Background(), c.message,
+		); !errs.Is(err, c.err) {
+			t.Errorf("Publishing packet %+v expected error: %v, got: %v",
+				c.message, c.err, err,
 			)
 		}
 	}
