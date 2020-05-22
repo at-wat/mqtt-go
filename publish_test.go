@@ -15,6 +15,7 @@
 package mqtt
 
 import (
+	"context"
 	"testing"
 
 	"github.com/at-wat/mqtt-go/internal/errs"
@@ -40,6 +41,25 @@ func TestPublish_ParseError(t *testing.T) {
 			t.Errorf("Parsing packet with flag=%x, contents=%v expected error: %v, got: %v",
 				c.flag, c.contents,
 				c.err, err,
+			)
+		}
+	}
+}
+
+func TestPublish_PayloadLengthValidation(t *testing.T) {
+	cli := &BaseClient{MaxPayloadLen: 100}
+
+	cases := []struct {
+		message *Message
+		err     error
+	}{
+		{&Message{Payload: make([]byte, 101)}, ErrPayloadLenExceeded},
+	}
+
+	for _, c := range cases {
+		if err := cli.Publish(context.Background(), c.message); !errs.Is(err, ErrPayloadLenExceeded) {
+			t.Errorf("Publishing packet with payload length %d expected error: %v, got: %v",
+				len(c.message.Payload), c.err, err,
 			)
 		}
 	}

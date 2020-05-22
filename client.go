@@ -27,6 +27,10 @@ type BaseClient struct {
 	// ConnState is called if the connection state is changed.
 	ConnState func(ConnState, error)
 
+	// MaxPayloadLen is a maximum allowed length of message payload.
+	// 0 means unlimited. (It will panic if exceeds protocol maximum message length (256MB).)
+	MaxPayloadLen int
+
 	handler      Handler
 	sig          *signaller
 	mu           sync.RWMutex

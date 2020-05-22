@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 )
 
 type publishFlag byte
@@ -28,6 +29,8 @@ const (
 	publishFlagQoSMask publishFlag = 0x06
 	publishFlagDup     publishFlag = 0x08
 )
+
+var ErrPayloadLenExceeded = errors.New("payload length exceeded")
 
 type pktPublish struct {
 	Message *Message
@@ -104,6 +107,10 @@ func (p *pktPublish) Pack() []byte {
 // Publish a message to the broker.
 // ID field of the message is filled if zero.
 func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
+	if c.MaxPayloadLen != 0 && len(message.Payload) >= c.MaxPayloadLen {
+		return wrapErrorf(ErrPayloadLenExceeded, "payload length %d", len(message.Payload))
+	}
+
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
