@@ -95,35 +95,39 @@ func TestIntegration_Connect(t *testing.T) {
 }
 
 func TestIntegration_Publish(t *testing.T) {
-	for name, url := range urls {
-		t.Run(name, func(t *testing.T) {
-			cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+	for _, size := range []int{0x100, 0x3FF7, 0x3FF8, 0x7FF7, 0x7FF8, 0x20000} {
+		t.Run(fmt.Sprintf("%dBytes", size), func(t *testing.T) {
+			for name, url := range urls {
+				t.Run(name, func(t *testing.T) {
+					cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if _, err := cli.Connect(ctx, "Client"); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if _, err := cli.Connect(ctx, fmt.Sprintf("Client%s%x", name, size)); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			if err := cli.Publish(ctx, &Message{
-				Topic:   "test",
-				Payload: []byte("message"),
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			if err := cli.Publish(ctx, &Message{
-				Topic:   "test",
-				QoS:     QoS1,
-				Payload: []byte("message"),
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					if err := cli.Publish(ctx, &Message{
+						Topic:   "test",
+						Payload: make([]byte, size),
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if err := cli.Publish(ctx, &Message{
+						Topic:   "test",
+						QoS:     QoS1,
+						Payload: make([]byte, size),
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			if err := cli.Disconnect(ctx); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
+					if err := cli.Disconnect(ctx); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+				})
 			}
 		})
 	}
