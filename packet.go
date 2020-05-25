@@ -93,18 +93,18 @@ func remainingLength(n int) []byte {
 	switch {
 	case n <= 0x7F:
 		return []byte{byte(n)}
-	case n <= 0x7FFF:
+	case n <= 0x3FFF:
 		return []byte{
 			byte(n) | 0x80,
 			byte(n>>7) & 0x7F,
 		}
-	case n <= 0x7FFFFF:
+	case n <= 0x1FFFFF:
 		return []byte{
 			byte(n) | 0x80,
 			byte(n>>7) | 0x80,
 			byte(n>>14) & 0x7F,
 		}
-	case n <= 0x7FFFFFFF:
+	case n <= 0xFFFFFFF:
 		return []byte{
 			byte(n) | 0x80,
 			byte(n>>7) | 0x80,
