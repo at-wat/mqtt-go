@@ -68,9 +68,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// mux := &mqtt.ServeAsync{Handler: &mqtt.ServeMux{}} // Async handler
-	mux := &mqtt.ServeMux{} // Sync handler
-	cli.Handle(mux)         // Register muxer as a low level handler.
+	mux := &mqtt.ServeMux{} // Multiplex message handlers by topic name.
+
+	// Register mux as a low-level handler.
+	// Wrap by ServeAsync to call handler in a new goroutine.
+	// note: Default handler processes messages in serial.
+	//       It causes deadlock if QoS>=1 message is published in QoS>=1 message handler.
+	cli.Handle(&mqtt.ServeAsync{Handler: mux})
 
 	mux.Handle("#", // Handle all topics by this handler.
 		mqtt.HandlerFunc(func(msg *mqtt.Message) {
