@@ -123,7 +123,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	var cli RetryClient
@@ -143,22 +143,21 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			QoS:     QoS1,
 			Payload: []byte("message"),
 		}); err != nil {
-			if err != ErrClosedClient {
-				t.Errorf("Unexpected error: '%v'", err)
-			}
+			t.Errorf("Unexpected error: '%v'", err)
 			return
 		}
 		cnt++
-		if cnt > 100 {
+		if cnt == 100 {
 			done()
 		}
 	}))
 	if err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(10 * time.Millisecond)
 
 	func() {
-		for {
+		for i := 0; i < 100; i++ {
 			if err := cli.Publish(ctx, &Message{
 				Topic:   "test/queue",
 				QoS:     QoS1,
@@ -170,15 +169,18 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				t.Errorf("Timeout (cnt=%d)", cnt)
-			case <-ctxDone.Done():
-				return
-			case <-time.After(10 * time.Millisecond):
+			default:
 			}
 		}
 	}()
 
+	select {
+	case <-ctx.Done():
+		t.Errorf("Timeout (cnt=%d)", cnt)
+	case <-ctxDone.Done():
+	}
+
 	if err := cli.Disconnect(ctx); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	time.Sleep(100 * time.Millisecond)
 }

@@ -161,7 +161,6 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 	err := c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		cli.Disconnect(ctx)
 	})
-	close(c.chTask)
 	return err
 }
 
@@ -184,28 +183,25 @@ func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 		return
 	}
 
-	c.chTask = make(chan struct{})
+	c.chTask = make(chan struct{}, 1)
 	go func() {
 		ctx := context.Background()
 		for {
-			_, ok := <-c.chTask
-			if !ok {
-				return
-			}
-
-			for {
-				c.mu.Lock()
-				if len(c.taskQueue) == 0 {
-					c.mu.Unlock()
-					break
-				}
-				task := c.taskQueue[0]
-				c.taskQueue = c.taskQueue[1:]
-				cli := c.cli
+			c.mu.Lock()
+			if len(c.taskQueue) == 0 {
 				c.mu.Unlock()
-
-				task(ctx, cli)
+				_, ok := <-c.chTask
+				if !ok {
+					return
+				}
+				continue
 			}
+			task := c.taskQueue[0]
+			c.taskQueue = c.taskQueue[1:]
+			cli := c.cli
+			c.mu.Unlock()
+
+			task(ctx, cli)
 		}
 	}()
 }
