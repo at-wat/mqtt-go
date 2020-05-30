@@ -46,7 +46,7 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	chUnsubAck := make(chan *pktUnsubAck, 1)
 	c.sig.mu.Lock()
 	if c.sig.chUnsubAck == nil {
-		c.sig.chUnsubAck = make(map[uint16]chan *pktUnsubAck)
+		c.sig.chUnsubAck = make(map[uint16]chan *pktUnsubAck, 1)
 	}
 	c.sig.chUnsubAck[id] = chUnsubAck
 	c.sig.mu.Unlock()

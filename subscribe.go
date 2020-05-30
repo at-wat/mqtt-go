@@ -70,7 +70,7 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 	chSubAck := make(chan *pktSubAck, 1)
 	c.sig.mu.Lock()
 	if c.sig.chSubAck == nil {
-		c.sig.chSubAck = make(map[uint16]chan *pktSubAck)
+		c.sig.chSubAck = make(map[uint16]chan *pktSubAck, 1)
 	}
 	c.sig.chSubAck[id] = chSubAck
 	c.sig.mu.Unlock()

@@ -141,7 +141,7 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		chPubAck = make(chan *pktPubAck, 1)
 		c.sig.mu.Lock()
 		if c.sig.chPubAck == nil {
-			c.sig.chPubAck = make(map[uint16]chan *pktPubAck)
+			c.sig.chPubAck = make(map[uint16]chan *pktPubAck, 1)
 		}
 		c.sig.chPubAck[message.ID] = chPubAck
 		c.sig.mu.Unlock()
@@ -150,11 +150,11 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		chPubComp = make(chan *pktPubComp, 1)
 		c.sig.mu.Lock()
 		if c.sig.chPubRec == nil {
-			c.sig.chPubRec = make(map[uint16]chan *pktPubRec)
+			c.sig.chPubRec = make(map[uint16]chan *pktPubRec, 1)
 		}
 		c.sig.chPubRec[message.ID] = chPubRec
 		if c.sig.chPubComp == nil {
-			c.sig.chPubComp = make(map[uint16]chan *pktPubComp)
+			c.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
 		}
 		c.sig.chPubComp[message.ID] = chPubComp
 		c.sig.mu.Unlock()
