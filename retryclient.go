@@ -16,8 +16,12 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
+
+// ErrClosedClient means operation was requested on closed client.
+var ErrClosedClient = errors.New("operation on closed client")
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
@@ -30,7 +34,8 @@ type RetryClient struct {
 	mu             sync.Mutex
 	muQueue        sync.Mutex
 	handler        Handler
-	chTask         chan func(ctx context.Context, cli Client)
+	chTask         chan struct{}
+	taskQueue      []func(ctx context.Context, cli Client)
 }
 
 // Handle registers the message handler.
@@ -156,7 +161,6 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 	err := c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		cli.Disconnect(ctx)
 	})
-	close(c.chTask)
 	return err
 }
 
@@ -179,13 +183,24 @@ func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 		return
 	}
 
-	c.chTask = make(chan func(ctx context.Context, cli Client))
+	c.chTask = make(chan struct{}, 1)
 	go func() {
 		ctx := context.Background()
-		for task := range c.chTask {
+		for {
 			c.mu.Lock()
+			if len(c.taskQueue) == 0 {
+				c.mu.Unlock()
+				_, ok := <-c.chTask
+				if !ok {
+					return
+				}
+				continue
+			}
+			task := c.taskQueue[0]
+			c.taskQueue = c.taskQueue[1:]
 			cli := c.cli
 			c.mu.Unlock()
+
 			task(ctx, cli)
 		}
 	}()
@@ -193,12 +208,20 @@ func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 
 func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Context, cli Client)) error {
 	c.mu.Lock()
-	chTask := c.chTask
-	c.mu.Unlock()
+	defer c.mu.Unlock()
+
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case chTask <- task:
+	case _, ok := <-c.chTask:
+		if !ok {
+			return ErrClosedClient
+		}
+	default:
+	}
+
+	c.taskQueue = append(c.taskQueue, task)
+	select {
+	case c.chTask <- struct{}{}:
+	default:
 	}
 	return nil
 }

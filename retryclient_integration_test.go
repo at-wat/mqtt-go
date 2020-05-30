@@ -116,3 +116,71 @@ func TestIntegration_RetryClient_Cancel(t *testing.T) {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 }
+
+func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
+	cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var cli RetryClient
+	cli.SetClient(ctx, cliBase)
+
+	if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	ctxDone, done := context.WithCancel(context.Background())
+	defer done()
+
+	var cnt int
+	cli.Handle(HandlerFunc(func(msg *Message) {
+		if err := cli.Publish(ctx, &Message{
+			Topic:   "test/queue_response",
+			QoS:     QoS1,
+			Payload: []byte("message"),
+		}); err != nil {
+			t.Errorf("Unexpected error: '%v'", err)
+			return
+		}
+		cnt++
+		if cnt == 100 {
+			done()
+		}
+	}))
+	if err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(10 * time.Millisecond)
+
+	func() {
+		for i := 0; i < 100; i++ {
+			if err := cli.Publish(ctx, &Message{
+				Topic:   "test/queue",
+				QoS:     QoS1,
+				Payload: []byte("message"),
+			}); err != nil {
+				t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
+				return
+			}
+			select {
+			case <-ctx.Done():
+				t.Errorf("Timeout (cnt=%d)", cnt)
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		t.Errorf("Timeout (cnt=%d)", cnt)
+	case <-ctxDone.Done():
+	}
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+}
