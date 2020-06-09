@@ -524,3 +524,52 @@ func TestIntegration_ReconnectClient_Ping(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_ReconnectClient_Context(t *testing.T) {
+	t.Run("CancelAfterConnect", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		cli, err := NewReconnectClient(
+			&URLDialer{
+				URL: urls["MQTT"],
+				Options: []DialOption{
+					WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+				},
+			},
+			WithPingInterval(250*time.Millisecond),
+			WithTimeout(250*time.Millisecond),
+			WithReconnectWait(200*time.Millisecond, time.Second),
+		)
+		if err != nil {
+			t.Fatalf("Unexpected error: '%v'", err)
+		}
+		if _, err := cli.Connect(ctx, "RetryClientContext1"); err != nil {
+			t.Fatalf("Unexpected error: '%v'", err)
+		}
+
+		cancel() // Once connected, connection must be kept
+
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel2()
+
+		if err := cli.Ping(ctx2); err != nil {
+			t.Errorf("Unexpected error: '%v'", err)
+		}
+		cli.Disconnect(ctx2)
+	})
+	t.Run("CancelBeforeConnect", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		cli, err := NewReconnectClient(
+			&URLDialer{URL: "mqtt://localhost:65535"},
+		)
+		if err != nil {
+			t.Fatalf("Unexpected error: '%v'", err)
+		}
+		if _, err := cli.Connect(ctx, "RetryClientContext2"); err != context.DeadlineExceeded {
+			t.Fatalf("Rxpected error: '%v', got: '%v'", context.DeadlineExceeded, err)
+		}
+	})
+}

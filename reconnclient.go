@@ -49,6 +49,8 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) 
 }
 
 // Connect starts connection retry loop.
+// The function returns after establishing a first connection, which can be canceled by the context.
+// Once after establising the connection, the retry loop is not affected by the context.
 func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (bool, error) {
 	connOptions := &ConnectOptions{
 		CleanSession: true,
@@ -68,7 +70,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 	done := make(chan struct{})
 	var doneOnce sync.Once
 	var sessionPresent bool
-	go func() {
+	go func(ctx context.Context) {
 		defer func() {
 			close(c.done)
 		}()
@@ -85,6 +87,12 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
 					cancel()
 
+					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
+					doneOnce.Do(func() {
+						ctx = context.Background()
+						close(done)
+					})
+
 					if !sessionPresent {
 						c.RetryClient.Resubscribe(ctx)
 					}
@@ -100,8 +108,6 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 							)
 						}()
 					}
-					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
-					doneOnce.Do(func() { close(done) })
 					select {
 					case <-baseCli.Done():
 						if err := baseCli.Err(); err == nil {
@@ -130,7 +136,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 				reconnWait = c.options.ReconnectWaitMax
 			}
 		}
-	}()
+	}(ctx)
 	select {
 	case <-done:
 	case <-ctx.Done():
