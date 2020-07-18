@@ -34,35 +34,56 @@ type Client struct {
 
 // Connect implements mqtt.Client.
 func (c *Client) Connect(ctx context.Context, clientID string, opts ...mqtt.ConnectOption) (sessionPresent bool, err error) {
+	if c.ConnectFn == nil {
+		return false, nil
+	}
 	return c.ConnectFn(ctx, clientID, opts...)
 }
 
 // Disconnect implements mqtt.Client.
 func (c *Client) Disconnect(ctx context.Context) error {
+	if c.DisconnectFn == nil {
+		return nil
+	}
 	return c.DisconnectFn(ctx)
 }
 
 // Publish implements mqtt.Client.
 func (c *Client) Publish(ctx context.Context, message *mqtt.Message) error {
+	if c.PublishFn == nil {
+		return nil
+	}
 	return c.PublishFn(ctx, message)
 }
 
 // Subscribe implements mqtt.Client.
 func (c *Client) Subscribe(ctx context.Context, subs ...mqtt.Subscription) error {
+	if c.SubscribeFn == nil {
+		return nil
+	}
 	return c.SubscribeFn(ctx, subs...)
 }
 
 // Unsubscribe implements mqtt.Client.
 func (c *Client) Unsubscribe(ctx context.Context, subs ...string) error {
+	if c.UnsubscribeFn == nil {
+		return nil
+	}
 	return c.UnsubscribeFn(ctx, subs...)
 }
 
 // Ping implements mqtt.Client.
 func (c *Client) Ping(ctx context.Context) error {
+	if c.PingFn == nil {
+		return nil
+	}
 	return c.PingFn(ctx)
 }
 
 // Handle implements mqtt.Client.
 func (c *Client) Handle(handler mqtt.Handler) {
+	if c.HandleFn == nil {
+		return
+	}
 	c.HandleFn(handler)
 }
