@@ -22,6 +22,7 @@ import (
 )
 
 // Client is a simple mock of mqtt.Client.
+// Handler registered by Handle() can be called by Client.Serve().
 type Client struct {
 	ConnectFn     func(ctx context.Context, clientID string, opts ...mqtt.ConnectOption) (sessionPresent bool, err error)
 	DisconnectFn  func(ctx context.Context) error
@@ -29,7 +30,7 @@ type Client struct {
 	SubscribeFn   func(ctx context.Context, subs ...mqtt.Subscription) error
 	UnsubscribeFn func(ctx context.Context, subs ...string) error
 	PingFn        func(ctx context.Context) error
-	HandleFn      func(handler mqtt.Handler)
+	handler       mqtt.Handler
 }
 
 // Connect implements mqtt.Client.
@@ -82,8 +83,10 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // Handle implements mqtt.Client.
 func (c *Client) Handle(handler mqtt.Handler) {
-	if c.HandleFn == nil {
-		return
-	}
-	c.HandleFn(handler)
+	c.handler = handler
+}
+
+// Serve implements mqtt.Handler.
+func (c *Client) Serve(message *mqtt.Message) {
+	c.handler.Serve(message)
 }
