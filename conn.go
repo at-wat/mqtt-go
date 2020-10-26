@@ -180,6 +180,15 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 	return c, nil
 }
 
+// SetErrorOnce sets client error value if not yet set.
+func (c *BaseClient) SetErrorOnce(err error) {
+	c.muErr.Lock()
+	if c.err == nil {
+		c.err = err
+	}
+	c.muErr.Unlock()
+}
+
 func (c *BaseClient) connStateUpdate(newState ConnState) {
 	c.mu.Lock()
 	lastState := c.connState
@@ -187,7 +196,7 @@ func (c *BaseClient) connStateUpdate(newState ConnState) {
 		c.connState = newState
 	}
 	state := c.connState
-	err := c.err
+	err := c.Err()
 	c.mu.Unlock()
 
 	if c.ConnState != nil && lastState != state {
@@ -209,7 +218,7 @@ func (c *BaseClient) Done() <-chan struct{} {
 
 // Err returns connection error.
 func (c *BaseClient) Err() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.muErr.Lock()
+	defer c.muErr.Unlock()
 	return c.err
 }
