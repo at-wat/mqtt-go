@@ -218,7 +218,7 @@ func (c *BaseClient) Done() <-chan struct{} {
 
 // Err returns connection error.
 func (c *BaseClient) Err() error {
-	c.muErr.Lock()
-	defer c.muErr.Unlock()
+	c.muErr.RLock()
+	defer c.muErr.RUnlock()
 	return c.err
 }
