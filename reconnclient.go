@@ -106,7 +106,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 								c.options.PingInterval,
 								c.options.Timeout,
 							); err != nil {
-								if cli, ok := c.cli.(*BaseClient); ok {
+								if cli, ok := c.Client().(*BaseClient); ok {
 									cli.SetErrorOnce(err)
 								}
 							}
