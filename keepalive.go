@@ -29,7 +29,9 @@ var ErrPingTimeout = errors.New("ping timeout")
 // KeepAlive runs keep alive loop.
 // It must be called after Connect and interval must be smaller than the value
 // specified by WithKeepAlive option passed to Connect.
-func KeepAlive(ctx context.Context, cli ClientCloser, interval, timeout time.Duration) error {
+// Caller should close the connection if it returned error according to
+// MQTT 3.1.1 spec. 3.1.2.10.
+func KeepAlive(ctx context.Context, cli Client, interval, timeout time.Duration) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -39,9 +41,6 @@ func KeepAlive(ctx context.Context, cli ClientCloser, interval, timeout time.Dur
 		ctxTo, cancel := context.WithTimeout(ctx, timeout)
 		if err := cli.Ping(ctxTo); err != nil {
 			defer cancel()
-			// The client should close the connection if PINGRESP is not returned.
-			// MQTT 3.1.1 spec. 3.1.2.10
-			cli.Close()
 
 			select {
 			case <-ctx.Done():
