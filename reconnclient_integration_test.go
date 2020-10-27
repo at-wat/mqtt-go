@@ -596,7 +596,7 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 			if err != nil {
 				return nil, err
 			}
-			ca, cb := filteredpipe.DetectAndClosePipe(
+			ca, cb := filteredpipe.DetectAndDropPipe(
 				newCloseFilter(byte(packetPingResp), true),
 				func([]byte) bool { return false },
 			)
@@ -616,7 +616,7 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
-	if _, err := cli.Connect(ctx, "RetryClientKeepAliveError", WithKeepAlive(1)); err != nil {
+	if _, err := cli.Connect(ctx, "RetryClientKeepAliveError", WithKeepAlive(60)); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
