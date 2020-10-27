@@ -156,7 +156,7 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
-					if _, err := cli.Connect(ctx, "PubSubClient"+name); err != nil {
+					if _, err := cli.Connect(ctx, "PubSubClient"+name, WithCleanSession(true)); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
@@ -164,12 +164,13 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 						chReceived <- msg
 					}))
 
-					if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: qos}); err != nil {
+					topic := "test_pubsub_" + name
+					if err := cli.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
 					if err := cli.Publish(ctx, &Message{
-						Topic:   "test",
+						Topic:   topic,
 						QoS:     qos,
 						Payload: []byte("message"),
 					}); err != nil {
@@ -184,8 +185,8 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 							t.Errorf("Connection closed unexpectedly")
 							break
 						}
-						if msg.Topic != "test" {
-							t.Errorf("Expected topic name of 'test', got '%s'", msg.Topic)
+						if msg.Topic != topic {
+							t.Errorf("Expected topic name of '%s', got '%s'", topic, msg.Topic)
 						}
 						if !bytes.Equal(msg.Payload, []byte("message")) {
 							t.Errorf("Expected payload of '%v', got '%v'", []byte("message"), msg.Payload)
