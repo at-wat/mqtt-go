@@ -172,7 +172,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 	return cli.Ping(ctx)
 }
 
-// Client gets the base client.
+// Client returns the base client.
 func (c *RetryClient) Client() ClientCloser {
 	c.mu.Lock()
 	defer c.mu.Unlock()
