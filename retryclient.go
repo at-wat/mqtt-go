@@ -172,6 +172,13 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 	return cli.Ping(ctx)
 }
 
+// Client returns the base client.
+func (c *RetryClient) Client() ClientCloser {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cli
+}
+
 // SetClient sets the new Client.
 // Call Retry() and Resubscribe() to process queued messages and subscriptions.
 func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {

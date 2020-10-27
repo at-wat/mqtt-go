@@ -573,3 +573,53 @@ func TestIntegration_ReconnectClient_Context(t *testing.T) {
 		}
 	})
 }
+
+func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chErr := make(chan error)
+
+	cli, err := NewReconnectClient(
+		DialerFunc(func() (ClientCloser, error) {
+			cli, err := Dial(urls["MQTT"],
+				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+			)
+			if err != nil {
+				return nil, err
+			}
+			ca, cb := filteredpipe.DetectAndClosePipe(
+				newCloseFilter(byte(packetPingResp), true),
+				func([]byte) bool { return false },
+			)
+			filteredpipe.Connect(ca, cli.Transport)
+			cli.Transport = cb
+			cli.ConnState = func(s ConnState, err error) {
+				if err != nil {
+					chErr <- err
+				}
+			}
+			return cli, nil
+		}),
+		WithPingInterval(100*time.Millisecond),
+		WithTimeout(100*time.Millisecond),
+		WithReconnectWait(100*time.Millisecond, 500*time.Millisecond),
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	if _, err := cli.Connect(ctx, "RetryClientKeepAliveError", WithKeepAlive(1)); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	select {
+	case err := <-chErr:
+		if err != ErrPingTimeout {
+			t.Errorf("Expected error '%v', got '%v'", ErrPingTimeout, err)
+		}
+	case <-ctx.Done():
+		t.Fatal("Timeout")
+	}
+
+	cli.Disconnect(ctx)
+}

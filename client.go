@@ -36,6 +36,7 @@ type BaseClient struct {
 	mu           sync.RWMutex
 	connState    ConnState
 	err          error
+	muErr        sync.RWMutex
 	connClosed   chan struct{}
 	muConnecting sync.RWMutex
 	muWrite      sync.Mutex

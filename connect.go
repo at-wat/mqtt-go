@@ -124,7 +124,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 		}
 		c.mu.Lock()
 		if c.connState != StateDisconnected {
-			c.err = err
+			c.SetErrorOnce(err)
 		}
 		c.mu.Unlock()
 		c.connStateUpdate(StateClosed)

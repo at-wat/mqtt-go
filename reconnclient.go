@@ -101,11 +101,15 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					if c.options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
-							_ = KeepAlive(
+							if err := KeepAlive(
 								ctx, baseCli,
 								c.options.PingInterval,
 								c.options.Timeout,
-							)
+							); err != nil {
+								if cli, ok := c.Client().(*BaseClient); ok {
+									cli.SetErrorOnce(err)
+								}
+							}
 						}()
 					}
 					select {
