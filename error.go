@@ -30,7 +30,7 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s: %s:%d: %s", e.Failure, filepath.Base(e.File), e.Line, e.Err.Error())
+	return fmt.Sprintf("%s (%s:%d): %s", e.Failure, filepath.Base(e.File), e.Line, e.Err.Error())
 }
 
 // Unwrap returns the reason of the failure.
