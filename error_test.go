@@ -34,13 +34,16 @@ func TestError(t *testing.T) {
 	errBase := errors.New("an error")
 	errOther := errors.New("an another error")
 	errChained := wrapErrorf(errBase, "info")
+	t.Log(`wrapErrorf(errBase, "info"):`, errChained)
 	errChained2 := wrapError(errBase, "info")
+	t.Log(`wrapError(errBase, "info"):`, errChained2)
 	errDoubleChained := wrapErrorf(errChained, "info")
+	t.Log(`wrapErrorf(errChained, "info"):`, errDoubleChained)
 	errChainedNil := wrapErrorf(nil, "info")
 	errChainedOther := wrapErrorf(errOther, "info")
 	err112Chained := wrapErrorf(&dummyError{errBase}, "info")
 	err112Nil := wrapErrorf(&dummyError{nil}, "info")
-	errStrRegex := regexp.MustCompile(`^info \(error_test\.go:[0-9]+\): an error$`)
+	errStrRegex := regexp.MustCompile(`^info \[error_test\.go:[0-9]+\]: an error$`)
 
 	t.Run("ErrorsIs", func(t *testing.T) {
 		if !errs.Is(errChained, errBase) {
