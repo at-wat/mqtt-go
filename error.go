@@ -16,18 +16,21 @@ package mqtt
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"runtime"
 )
 
 // Error records a failed parsing.
 type Error struct {
 	Err     error
 	Failure string
+	File    string
+	Line    int
 }
 
 func (e *Error) Error() string {
-	// TODO: migrate to fmt.Sprintf %w once Go1.12 reaches EOL.
-	return e.Failure + ": " + e.Err.Error()
+	return fmt.Sprintf("%s: %s:%d: %s", e.Failure, filepath.Base(e.File), e.Line, e.Err.Error())
 }
 
 // Unwrap returns the reason of the failure.
@@ -76,9 +79,16 @@ func (e *Error) Is(target error) bool {
 }
 
 func wrapError(err error, failure string) error {
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		file = "unknown"
+		line = -1
+	}
 	return &Error{
 		Failure: failure,
 		Err:     err,
+		File:    file,
+		Line:    line,
 	}
 }
 

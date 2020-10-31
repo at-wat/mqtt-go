@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/at-wat/mqtt-go/internal/errs"
@@ -38,7 +39,7 @@ func TestError(t *testing.T) {
 	errChainedOther := wrapErrorf(errOther, "info")
 	err112Chained := wrapErrorf(&dummyError{errBase}, "info")
 	err112Nil := wrapErrorf(&dummyError{nil}, "info")
-	errStr := "info: an error"
+	errStrRegex := regexp.MustCompile(`^info: error_test\.go:[0-9]+: an error$`)
 
 	t.Run("ErrorsIs", func(t *testing.T) {
 		if !errs.Is(errChained, errBase) {
@@ -78,8 +79,8 @@ func TestError(t *testing.T) {
 		}
 	})
 
-	if errChained.Error() != errStr {
-		t.Errorf("Error string expected: %s, got: %s", errStr, errChained.Error())
+	if !errStrRegex.MatchString(errChained.Error()) {
+		t.Errorf("Error string expected regexp: '%s', got: '%s'", errStrRegex, errChained.Error())
 	}
 	if errChained.(*Error).Unwrap() != errBase {
 		t.Errorf("Unwrapped error expected: %s, got: %s", errBase, errChained.(*Error).Unwrap())
