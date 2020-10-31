@@ -78,7 +78,7 @@ func (e *Error) Is(target error) bool {
 	}
 }
 
-func wrapError(err error, failure string) error {
+func wrapErrorImpl(err error, failure string) error {
 	_, file, line, ok := runtime.Caller(2)
 	if !ok {
 		file = "unknown"
@@ -92,6 +92,10 @@ func wrapError(err error, failure string) error {
 	}
 }
 
+func wrapError(err error, failure string) error {
+	return wrapErrorImpl(err, failure)
+}
+
 func wrapErrorf(err error, failureFmt string, v ...interface{}) error {
-	return wrapError(err, fmt.Sprintf(failureFmt, v...))
+	return wrapErrorImpl(err, fmt.Sprintf(failureFmt, v...))
 }
