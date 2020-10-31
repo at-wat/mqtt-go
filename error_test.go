@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/at-wat/mqtt-go/internal/errs"
@@ -33,16 +34,20 @@ func TestError(t *testing.T) {
 	errBase := errors.New("an error")
 	errOther := errors.New("an another error")
 	errChained := wrapErrorf(errBase, "info")
+	errChained2 := wrapError(errBase, "info")
 	errDoubleChained := wrapErrorf(errChained, "info")
 	errChainedNil := wrapErrorf(nil, "info")
 	errChainedOther := wrapErrorf(errOther, "info")
 	err112Chained := wrapErrorf(&dummyError{errBase}, "info")
 	err112Nil := wrapErrorf(&dummyError{nil}, "info")
-	errStr := "info: an error"
+	errStrRegex := regexp.MustCompile(`^info \(error_test\.go:[0-9]+\): an error$`)
 
 	t.Run("ErrorsIs", func(t *testing.T) {
 		if !errs.Is(errChained, errBase) {
 			t.Errorf("Wrapped error '%v' doesn't chain '%v'", errChained, errBase)
+		}
+		if !errs.Is(errChained2, errBase) {
+			t.Errorf("Wrapped error '%v' doesn't chain '%v'", errChained2, errBase)
 		}
 	})
 
@@ -52,6 +57,12 @@ func TestError(t *testing.T) {
 		}
 		if !errChained.(*Error).Is(errBase) {
 			t.Errorf("Wrapped error '%v' doesn't match '%v'", errChained, errBase)
+		}
+		if !errChained2.(*Error).Is(errChained2) {
+			t.Errorf("Wrapped error '%v' doesn't match its-self", errChained2)
+		}
+		if !errChained2.(*Error).Is(errBase) {
+			t.Errorf("Wrapped error '%v' doesn't match '%v'", errChained2, errBase)
 		}
 		if !errDoubleChained.(*Error).Is(errBase) {
 			t.Errorf("Wrapped error '%v' doesn't match '%v'", errDoubleChained, errBase)
@@ -78,10 +89,16 @@ func TestError(t *testing.T) {
 		}
 	})
 
-	if errChained.Error() != errStr {
-		t.Errorf("Error string expected: %s, got: %s", errStr, errChained.Error())
+	if !errStrRegex.MatchString(errChained.Error()) {
+		t.Errorf("Error string expected regexp: '%s', got: '%s'", errStrRegex, errChained.Error())
 	}
 	if errChained.(*Error).Unwrap() != errBase {
 		t.Errorf("Unwrapped error expected: %s, got: %s", errBase, errChained.(*Error).Unwrap())
+	}
+	if !errStrRegex.MatchString(errChained2.Error()) {
+		t.Errorf("Error string expected regexp: '%s', got: '%s'", errStrRegex, errChained2.Error())
+	}
+	if errChained2.(*Error).Unwrap() != errBase {
+		t.Errorf("Unwrapped error expected: %s, got: %s", errBase, errChained2.(*Error).Unwrap())
 	}
 }
