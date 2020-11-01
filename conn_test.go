@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestDialOptionError(t *testing.T) {
@@ -46,7 +44,7 @@ func TestDialOption_WithDialer(t *testing.T) {
 }
 
 func TestDial_UnsupportedProtocol(t *testing.T) {
-	if _, err := Dial("unknown://localhost:1884"); !errs.Is(err, ErrUnsupportedProtocol) {
+	if _, err := Dial("unknown://localhost:1884"); !errors.Is(err, ErrUnsupportedProtocol) {
 		t.Errorf("Expected error: '%v', got: '%v'", ErrUnsupportedProtocol, err)
 	}
 }

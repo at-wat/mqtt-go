@@ -25,8 +25,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestRemainingLength(t *testing.T) {
@@ -141,7 +139,7 @@ func TestPacketParseError(t *testing.T) {
 			if !ok {
 				t.Fatal("Second return value of Parse is not error.")
 			}
-			if !errs.Is(err, c.err) {
+			if !errors.Is(err, c.err) {
 				t.Errorf("Parse result is expected to be: '%v', got: '%v'", c.err, err)
 			}
 		})
@@ -202,22 +200,22 @@ func TestPacketSendError(t *testing.T) {
 	ca.Close()
 
 	t.Run("Subscribe", func(t *testing.T) {
-		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errs.Is(err, io.ErrClosedPipe) {
+		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
 	t.Run("Unsubscribe", func(t *testing.T) {
-		if err := cli.Unsubscribe(ctx, "test"); !errs.Is(err, io.ErrClosedPipe) {
+		if err := cli.Unsubscribe(ctx, "test"); !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
 	t.Run("PingReq", func(t *testing.T) {
-		if err := cli.Ping(ctx); !errs.Is(err, io.ErrClosedPipe) {
+		if err := cli.Ping(ctx); !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
 	t.Run("Publish", func(t *testing.T) {
-		if err := cli.Publish(ctx, &Message{}); !errs.Is(err, io.ErrClosedPipe) {
+		if err := cli.Publish(ctx, &Message{}); !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
@@ -305,7 +303,7 @@ func TestConnectionError(t *testing.T) {
 			for i, req := range reqs {
 				err := req(ctx, cli)
 				if i == c.errorAt {
-					if !errs.Is(err, io.ErrClosedPipe) {
+					if !errors.Is(err, io.ErrClosedPipe) {
 						t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 					}
 					break

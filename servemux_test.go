@@ -15,16 +15,15 @@
 package mqtt
 
 import (
+	"errors"
 	"reflect"
 	"testing"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestServeMux_HandleFunc(t *testing.T) {
 	mux := &ServeMux{}
 
-	if err := mux.HandleFunc("", func(*Message) {}); !errs.Is(err, ErrInvalidTopicFilter) {
+	if err := mux.HandleFunc("", func(*Message) {}); !errors.Is(err, ErrInvalidTopicFilter) {
 		t.Errorf("Expect error against invalid filter: %v, got: %v", ErrInvalidTopicFilter, err)
 	}
 	topic1 := []Message{}
