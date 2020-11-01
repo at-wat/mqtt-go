@@ -74,14 +74,10 @@ func TestError(t *testing.T) {
 			t.Errorf("Wrapped error '%v' doesn't match '%v'",
 				err112Chained, errBase)
 		}
-		if !errChainedNil.(*Error).Is(nil) {
+		if errChainedNil != nil {
 			t.Errorf("Nil chained error '%v' doesn't match 'nil'", errChainedNil)
 		}
 
-		if errChainedNil.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
-				errChainedNil, errBase)
-		}
 		if errChainedOther.(*Error).Is(errBase) {
 			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
 				errChainedOther, errBase)

@@ -147,7 +147,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return false, ctx.Err()
+		return false, wrapError(ctx.Err(), "establishing first connection")
 	}
 	return sessionPresent, nil
 }
@@ -159,7 +159,7 @@ func (c *reconnectClient) Disconnect(ctx context.Context) error {
 	select {
 	case <-c.done:
 	case <-ctx.Done():
-		return ctx.Err()
+		return wrapError(ctx.Err(), "disconnecting")
 	}
 	return err
 }

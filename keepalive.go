@@ -45,12 +45,12 @@ func KeepAlive(ctx context.Context, cli Client, interval, timeout time.Duration)
 			select {
 			case <-ctx.Done():
 				// Parent context cancelled.
-				return ctx.Err()
+				return wrapError(ctx.Err(), "keeping alive")
 			default:
 			}
 			select {
 			case <-ctxTo.Done():
-				return ErrPingTimeout
+				return wrapError(ErrPingTimeout, "keeping alive")
 			default:
 			}
 			return err

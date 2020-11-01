@@ -130,7 +130,7 @@ func TestConnect_OptionsError(t *testing.T) {
 			return errExpected
 		},
 	)
-	if err != errExpected {
+	if !errors.Is(err, errExpected) {
 		t.Errorf("Expected error: ''%v'', got: ''%v''", errExpected, err)
 	}
 	if sessionPresent {
@@ -197,8 +197,8 @@ func TestConnect_Error(t *testing.T) {
 			if err == c.err {
 				return
 			}
-			conErr, ok := err.(*ConnectionError)
-			if !ok {
+			var conErr *ConnectionError
+			if !errors.As(err, &conErr) {
 				t.Fatal("Returned error type is not ConnectionError")
 			}
 			if conErr.Unwrap() != c.err {

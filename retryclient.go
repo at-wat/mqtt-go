@@ -53,28 +53,28 @@ func (c *RetryClient) Handle(handler Handler) {
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	if cli, ok := c.cli.(*BaseClient); ok {
 		if err := cli.ValidateMessage(message); err != nil {
-			return err
+			return wrapError(err, "validating publishing message")
 		}
 	}
-	return c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		c.publish(ctx, false, cli, message)
-	})
+	}), "retryclient: publishing")
 }
 
 // Subscribe tries to subscribe the topic and immediately return nil.
 // If it is not acknowledged to be subscribed, the request will be queued.
 func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	return c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		c.subscribe(ctx, false, cli, subs...)
-	})
+	}), "retryclient: subscribing")
 }
 
 // Unsubscribe tries to unsubscribe the topic and immediately return nil.
 // If it is not acknowledged to be unsubscribed, the request will be queued.
 func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
-	return c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		c.unsubscribe(ctx, false, cli, topics...)
-	})
+	}), "retryclient: unsubscribing")
 }
 
 func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, message *Message) {
@@ -158,10 +158,9 @@ func (c *RetryClient) removeEstablished(topics ...string) {
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	err := c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
 		cli.Disconnect(ctx)
-	})
-	return err
+	}), "retryclient: disconnecting")
 }
 
 // Ping to the broker.
@@ -169,7 +168,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 	c.mu.Lock()
 	cli := c.cli
 	c.mu.Unlock()
-	return cli.Ping(ctx)
+	return wrapError(cli.Ping(ctx), "retryclient: pinging")
 }
 
 // Client returns the base client.
@@ -242,7 +241,7 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 
 	present, err := cli.Connect(ctx, clientID, opts...)
 
-	return present, err
+	return present, wrapError(err, "retryclient: connecting")
 }
 
 // Resubscribe subscribes all established subscriptions.

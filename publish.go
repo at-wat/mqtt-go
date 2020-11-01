@@ -168,17 +168,17 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 	case QoS1:
 		select {
 		case <-c.connClosed:
-			return ErrClosedTransport
+			return wrapError(ErrClosedTransport, "waiting PUBACK")
 		case <-ctx.Done():
-			return ctx.Err()
+			return wrapError(ctx.Err(), "waiting PUBACK")
 		case <-chPubAck:
 		}
 	case QoS2:
 		select {
 		case <-c.connClosed:
-			return ErrClosedTransport
+			return wrapError(ErrClosedTransport, "waiting PUBREC")
 		case <-ctx.Done():
-			return ctx.Err()
+			return wrapError(ctx.Err(), "waiting PUBREC")
 		case <-chPubRec:
 		}
 		pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
@@ -187,9 +187,9 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		}
 		select {
 		case <-c.connClosed:
-			return ErrClosedTransport
+			return wrapError(ErrClosedTransport, "waiting PUBCOMP")
 		case <-ctx.Done():
-			return ctx.Err()
+			return wrapError(ctx.Err(), "waiting PUBCOMP")
 		case <-chPubComp:
 		}
 	}

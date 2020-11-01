@@ -19,7 +19,7 @@ type pktPingResp struct {
 
 func (p *pktPingResp) Parse(flag byte, contents []byte) (*pktPingResp, error) {
 	if flag != 0 {
-		return nil, ErrInvalidPacket
+		return nil, wrapError(ErrInvalidPacket, "parsing PINGRESP")
 	}
 	return p, nil
 }

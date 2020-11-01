@@ -57,9 +57,9 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	}
 	select {
 	case <-c.connClosed:
-		return ErrClosedTransport
+		return wrapError(ErrClosedTransport, "waiting UNSUBACK")
 	case <-ctx.Done():
-		return ctx.Err()
+		return wrapError(ctx.Err(), "waiting UNSUBACK")
 	case <-chUnsubAck:
 	}
 	return nil

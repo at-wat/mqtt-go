@@ -34,9 +34,9 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 	}
 	select {
 	case <-c.connClosed:
-		return ErrClosedTransport
+		return wrapError(ErrClosedTransport, "sending PINGREQ")
 	case <-ctx.Done():
-		return ctx.Err()
+		return wrapError(ctx.Err(), "waiting PINGRESP")
 	case <-chPingResp:
 	}
 	return nil

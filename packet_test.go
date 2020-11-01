@@ -17,6 +17,7 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -166,27 +167,27 @@ func TestPacketSendCancel(t *testing.T) {
 	cancel()
 
 	t.Run("Subscribe", func(t *testing.T) {
-		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); err != context.Canceled {
+		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})
 	t.Run("Unsubscribe", func(t *testing.T) {
-		if err := cli.Unsubscribe(ctx, "test"); err != context.Canceled {
+		if err := cli.Unsubscribe(ctx, "test"); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})
 	t.Run("PingReq", func(t *testing.T) {
-		if err := cli.Ping(ctx); err != context.Canceled {
+		if err := cli.Ping(ctx); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})
 	t.Run("PublishQoS1", func(t *testing.T) {
-		if err := cli.Publish(ctx, &Message{QoS: QoS1}); err != context.Canceled {
+		if err := cli.Publish(ctx, &Message{QoS: QoS1}); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})
 	t.Run("PublishQoS2", func(t *testing.T) {
-		if err := cli.Publish(ctx, &Message{QoS: QoS1}); err != context.Canceled {
+		if err := cli.Publish(ctx, &Message{QoS: QoS1}); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})

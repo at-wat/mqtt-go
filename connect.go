@@ -110,7 +110,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
-			return false, err
+			return false, wrapError(err, "applying options")
 		}
 	}
 	c.init()
@@ -153,13 +153,13 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	case <-c.connClosed:
 		return false, ErrClosedTransport
 	case <-ctx.Done():
-		return false, ctx.Err()
+		return false, wrapError(ctx.Err(), "waiting CONNACK")
 	case connAck := <-chConnAck:
 		if connAck.Code != ConnectionAccepted {
-			return false, &ConnectionError{
+			return false, wrapError(&ConnectionError{
 				Err:  ErrConnectionFailed,
 				Code: connAck.Code,
-			}
+			}, "received CONNACK")
 		}
 		c.connStateUpdate(StateActive)
 		return connAck.SessionPresent, nil
@@ -228,7 +228,7 @@ func WithWill(will *Message) ConnectOption {
 		switch will.QoS {
 		case QoS0, QoS1, QoS2:
 		default:
-			return ErrInvalidPacket
+			return wrapErrorf(ErrInvalidPacket, "setting will with QoS%d", int(will.QoS))
 		}
 		o.Will = will
 		return nil
