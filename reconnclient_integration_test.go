@@ -19,6 +19,7 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -576,7 +577,7 @@ func TestIntegration_ReconnectClient_Context(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: '%v'", err)
 		}
-		if _, err := cli.Connect(ctx, "RetryClientContext2"); err != context.DeadlineExceeded {
+		if _, err := cli.Connect(ctx, "RetryClientContext2"); !errors.Is(err, context.DeadlineExceeded) {
 			t.Fatalf("Rxpected error: '%v', got: '%v'", context.DeadlineExceeded, err)
 		}
 	})
@@ -622,7 +623,7 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 
 	select {
 	case err := <-chErr:
-		if err != ErrPingTimeout {
+		if !errors.Is(err, ErrPingTimeout) {
 			t.Errorf("Expected error '%v', got '%v'", ErrPingTimeout, err)
 		}
 	case <-ctx.Done():
