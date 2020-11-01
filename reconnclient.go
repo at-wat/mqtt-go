@@ -50,7 +50,7 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) 
 
 // Connect starts connection retry loop.
 // The function returns after establishing a first connection, which can be canceled by the context.
-// Once after establising the connection, the retry loop is not affected by the context.
+// Once after establishing the connection, the retry loop is not affected by the context.
 func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (bool, error) {
 	connOptions := &ConnectOptions{
 		CleanSession: true,
