@@ -81,9 +81,9 @@ func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error 
 	}
 	select {
 	case <-c.connClosed:
-		return ErrClosedTransport
+		return wrapError(ErrClosedTransport, "waiting SUBACK")
 	case <-ctx.Done():
-		return ctx.Err()
+		return wrapError(ctx.Err(), "waiting SUBACK")
 	case subAck := <-chSubAck:
 		if len(subAck.Codes) != len(subs) {
 			c.Transport.Close()

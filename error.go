@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -79,6 +80,12 @@ func (e *Error) Is(target error) bool {
 }
 
 func wrapErrorImpl(err error, failure string) error {
+	switch err {
+	case io.EOF:
+		return io.EOF
+	case nil:
+		return nil
+	}
 	_, file, line, ok := runtime.Caller(2)
 	if !ok {
 		file = "unknown"

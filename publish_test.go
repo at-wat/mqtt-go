@@ -16,9 +16,8 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"testing"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestPublish_ParseError(t *testing.T) {
@@ -37,7 +36,7 @@ func TestPublish_ParseError(t *testing.T) {
 
 	for _, c := range cases {
 		_, err := (&pktPublish{}).Parse(c.flag, c.contents)
-		if !errs.Is(err, c.err) {
+		if !errors.Is(err, c.err) {
 			t.Errorf("Parsing packet with flag=%x, contents=%v expected error: %v, got: %v",
 				c.flag, c.contents,
 				c.err, err,
@@ -60,7 +59,7 @@ func TestPublish_MessageValidation(t *testing.T) {
 	for _, c := range cases {
 		if err := cli.Publish(
 			context.Background(), c.message,
-		); !errs.Is(err, c.err) {
+		); !errors.Is(err, c.err) {
 			t.Errorf("Publishing packet %+v expected error: %v, got: %v",
 				c.message, c.err, err,
 			)

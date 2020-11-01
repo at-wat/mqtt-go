@@ -18,8 +18,6 @@ import (
 	"errors"
 	"regexp"
 	"testing"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 type dummyError struct {
@@ -46,10 +44,10 @@ func TestError(t *testing.T) {
 	errStrRegex := regexp.MustCompile(`^info \[error_test\.go:[0-9]+\]: an error$`)
 
 	t.Run("ErrorsIs", func(t *testing.T) {
-		if !errs.Is(errChained, errBase) {
+		if !errors.Is(errChained, errBase) {
 			t.Errorf("Wrapped error '%v' doesn't chain '%v'", errChained, errBase)
 		}
-		if !errs.Is(errChained2, errBase) {
+		if !errors.Is(errChained2, errBase) {
 			t.Errorf("Wrapped error '%v' doesn't chain '%v'", errChained2, errBase)
 		}
 	})
@@ -74,14 +72,10 @@ func TestError(t *testing.T) {
 			t.Errorf("Wrapped error '%v' doesn't match '%v'",
 				err112Chained, errBase)
 		}
-		if !errChainedNil.(*Error).Is(nil) {
+		if errChainedNil != nil {
 			t.Errorf("Nil chained error '%v' doesn't match 'nil'", errChainedNil)
 		}
 
-		if errChainedNil.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
-				errChainedNil, errBase)
-		}
 		if errChainedOther.(*Error).Is(errBase) {
 			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
 				errChainedOther, errBase)

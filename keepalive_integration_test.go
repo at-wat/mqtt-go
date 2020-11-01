@@ -19,6 +19,7 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"testing"
 	"time"
 )
@@ -45,7 +46,7 @@ func TestIntegration_KeepAlive(t *testing.T) {
 				ctx, cli,
 				time.Second,
 				500*time.Millisecond,
-			); err != context.DeadlineExceeded {
+			); !errors.Is(err, context.DeadlineExceeded) {
 				t.Errorf("Expected error: '%v', got: '%v'", context.DeadlineExceeded, err)
 
 				if err := cli.Disconnect(ctx); err != nil {

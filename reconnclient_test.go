@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -36,7 +37,7 @@ func TestReconnectClient_DefaultOptions(t *testing.T) {
 	if _, err = cli.Connect(ctx,
 		"ReconnectClient",
 		WithKeepAlive(uint16(keepAlive)),
-	); err != context.Canceled {
+	); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Expected error: '%v', got: '%v'", context.Canceled, err)
 	}
 	reconnCli := cli.(*reconnectClient)

@@ -17,12 +17,11 @@ package mqtt
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"testing"
 	"time"
-
-	"github.com/at-wat/mqtt-go/internal/errs"
 )
 
 func TestRemainingLengthParse(t *testing.T) {
@@ -112,7 +111,7 @@ func TestServeParseError(t *testing.T) {
 					t.Fatalf("Unexpected error: '%v'", err)
 				}
 			}()
-			if err := cli.serve(); !errs.Is(err, c.err) {
+			if err := cli.serve(); !errors.Is(err, c.err) {
 				t.Fatalf("Expected error: '%v', got: '%v'", c.err, err)
 			}
 		})
