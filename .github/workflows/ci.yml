@@ -47,18 +47,18 @@ jobs:
           go test $(go list ./... | grep -v examples) \
             -v \
             -tags integration \
-            -race -coverprofile=coverage.txt -covermode=atomic
+            -race -coverprofile=cover.out -covermode=atomic
 
           (cd paho; go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION})
           (cd paho; go vet ./...)
           (cd paho; go test ./... \
             -v \
             -tags integration \
-            -race -coverprofile=coverage.txt -covermode=atomic)
+            -race -coverprofile=cover.out -covermode=atomic)
 
           go mod tidy
           git diff --exit-code go.mod go.sum  # mod/sum must be up-to-date and tidied
       - uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./cover.out
+          files: ./cover.out,./paho/cover.out
