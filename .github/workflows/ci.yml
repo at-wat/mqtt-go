@@ -1,0 +1,62 @@
+name: ci
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go:
+          - '1.13'
+          - '1.14'
+          - '1.15'
+        env:
+          - PAHO_VERSION=v1.2.0
+          - PAHO_VERSION=0d940dd29fd24f905cd16b28b1209b4977b97e1a
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Check paho wrapper go.mod
+        run: |
+          (! grep require paho/go.mod)
+          (! grep replace paho/go.mod)  # don't add require/replace to paho/go.mod
+      - name: Prepare integration test
+        run: |
+          docker-compose up -d
+          echo 'replace github.com/at-wat/mqtt-go => ../' >> paho/go.mod
+      - name: Run go test
+        run: |
+          eval ${{ matrix.env }}
+
+          go vet -tags integration ./...
+          go build ./...
+
+          go test $(go list ./... | grep -v examples) \
+            -v \
+            -tags integration \
+            -race -coverprofile=coverage.txt -covermode=atomic
+
+          (cd paho; go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION})
+          (cd paho; go vet ./...)
+          (cd paho; go test ./... \
+            -v \
+            -tags integration \
+            -race -coverprofile=coverage.txt -covermode=atomic)
+          git diff --exit-code go.mod go.sum  # mod/sum must be up-to-date and tidied
+      - uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./cover.out
