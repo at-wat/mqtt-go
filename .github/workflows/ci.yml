@@ -21,7 +21,7 @@ jobs:
           - PAHO_VERSION=v1.2.0
           - PAHO_VERSION=0d940dd29fd24f905cd16b28b1209b4977b97e1a
     env:
-      - GO111MODULE: on
+      GO111MODULE: on
     steps:
       - name: Checkout
         uses: actions/checkout@v2
