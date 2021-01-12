@@ -99,35 +99,41 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, messa
 }
 
 func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, subs ...Subscription) {
-	if err := cli.Subscribe(ctx, subs...); err != nil {
-		select {
-		case <-ctx.Done():
-			if !retry {
-				// User cancelled; don't queue.
-				return
+	if len(c.subQueue) == 0 {
+		if err := cli.Subscribe(ctx, subs...); err != nil {
+			select {
+			case <-ctx.Done():
+				if !retry {
+					// User cancelled; don't queue.
+					return
+				}
+			default:
 			}
-		default:
+		} else {
+			subscriptions(subs).applyTo(&c.subEstablished)
+			return
 		}
-		c.subQueue = append(c.subQueue, subscriptions(subs))
-	} else {
-		subscriptions(subs).applyTo(&c.subEstablished)
 	}
+	c.subQueue = append(c.subQueue, subscriptions(subs))
 }
 
 func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, topics ...string) {
-	if err := cli.Unsubscribe(ctx, topics...); err != nil {
-		select {
-		case <-ctx.Done():
-			if !retry {
-				// User cancelled; don't queue.
-				return
+	if len(c.subQueue) == 0 {
+		if err := cli.Unsubscribe(ctx, topics...); err != nil {
+			select {
+			case <-ctx.Done():
+				if !retry {
+					// User cancelled; don't queue.
+					return
+				}
+			default:
 			}
-		default:
+		} else {
+			unsubscriptions(topics).applyTo(&c.subEstablished)
+			return
 		}
-		c.subQueue = append(c.subQueue, unsubscriptions(topics))
-	} else {
-		unsubscriptions(topics).applyTo(&c.subEstablished)
 	}
+	c.subQueue = append(c.subQueue, unsubscriptions(topics))
 }
 
 // Disconnect from the broker.
