@@ -267,18 +267,16 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		c.subQueue = nil
 
 		// Retry publish.
-		go func() {
-			for _, sub := range oldSubQueue {
-				switch s := sub.(type) {
-				case subscriptions:
-					c.subscribe(ctx, true, cli, s...)
-				case unsubscriptions:
-					c.unsubscribe(ctx, true, cli, s...)
-				}
+		for _, sub := range oldSubQueue {
+			switch s := sub.(type) {
+			case subscriptions:
+				c.subscribe(ctx, true, cli, s...)
+			case unsubscriptions:
+				c.unsubscribe(ctx, true, cli, s...)
 			}
-			for _, msg := range oldPubQueue {
-				c.publish(ctx, true, cli, msg)
-			}
-		}()
+		}
+		for _, msg := range oldPubQueue {
+			c.publish(ctx, true, cli, msg)
+		}
 	})
 }
