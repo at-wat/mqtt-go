@@ -46,32 +46,6 @@ func (c *RetryClient) Handle(handler Handler) {
 	}
 }
 
-type subTask interface {
-	applyTo(*subscriptions)
-}
-
-type subscriptions []Subscription
-
-func (s subscriptions) applyTo(d *subscriptions) {
-	*d = append(*d, s...)
-}
-
-type unsubscriptions []string
-
-func (s unsubscriptions) applyTo(d *subscriptions) {
-	l := len(*d)
-	for _, topic := range s {
-		for i, e := range *d {
-			if e.Topic == topic {
-				l--
-				(*d)[i] = (*d)[l]
-				break
-			}
-		}
-	}
-	*d = (*d)[:l]
-}
-
 // Publish tries to publish the message and immediately returns.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {

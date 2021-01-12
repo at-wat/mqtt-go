@@ -1,4 +1,4 @@
-// Copyright 2020 The mqtt-go authors.
+// Copyright 2019 The mqtt-go authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,23 +14,28 @@
 
 package mqtt
 
-import (
-	"context"
-	"errors"
-	"testing"
-)
+type subTask interface {
+	applyTo(*subscriptions)
+}
 
-func TestRetryClientPublish_MessageValidationError(t *testing.T) {
-	cli := &RetryClient{
-		cli: &BaseClient{
-			MaxPayloadLen: 100,
-		},
+type subscriptions []Subscription
+
+func (s subscriptions) applyTo(d *subscriptions) {
+	*d = append(*d, s...)
+}
+
+type unsubscriptions []string
+
+func (s unsubscriptions) applyTo(d *subscriptions) {
+	l := len(*d)
+	for _, topic := range s {
+		for i, e := range *d {
+			if e.Topic == topic {
+				l--
+				(*d)[i] = (*d)[l]
+				break
+			}
+		}
 	}
-	if err := cli.Publish(context.Background(), &Message{
-		Payload: make([]byte, 101),
-	}); !errors.Is(err, ErrPayloadLenExceeded) {
-		t.Errorf("Publishing too large payload expected error: %v, got: %v",
-			ErrPayloadLenExceeded, err,
-		)
-	}
+	*d = (*d)[:l]
 }
