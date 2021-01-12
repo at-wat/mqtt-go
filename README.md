@@ -4,7 +4,7 @@
 
 ## Yet another Go MQTT 3.1.1 client library
 
-Low layer, context-based synchronous
+Context-based synchronous and thread safe MQTT 3.1.1 client library.
 
 
 ## Examples
