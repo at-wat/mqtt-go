@@ -27,12 +27,10 @@ var ErrClosedClient = errors.New("operation on closed client")
 type RetryClient struct {
 	cli ClientCloser
 
-	pubQueue       []*Message       // unacknoledged messages
-	subQueue       [][]Subscription // unacknoledged subscriptions
-	unsubQueue     [][]string       // unacknoledged unsubscriptions
-	subEstablished []Subscription   // acknoledged subscriptions
+	pubQueue       []*Message    // unacknoledged messages
+	subQueue       []subTask     // unacknoledged subscriptions
+	subEstablished subscriptions // acknoledged subscriptions
 	mu             sync.Mutex
-	muQueue        sync.Mutex
 	handler        Handler
 	chTask         chan struct{}
 	taskQueue      []func(ctx context.Context, cli Client)
@@ -78,82 +76,64 @@ func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
 }
 
 func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, message *Message) {
-	if err := cli.Publish(ctx, message); err != nil {
-		select {
-		case <-ctx.Done():
-			if !retry {
-				// User cancelled; don't queue.
-				return
+	if len(c.pubQueue) == 0 {
+		if err := cli.Publish(ctx, message); err != nil {
+			select {
+			case <-ctx.Done():
+				if !retry {
+					// User cancelled; don't queue.
+					return
+				}
+			default:
 			}
-		default:
+		} else {
+			return
 		}
-		if message.QoS > QoS0 {
-			copyMsg := *message
+	}
+	if message.QoS > QoS0 {
+		copyMsg := *message
 
-			c.muQueue.Lock()
-			copyMsg.Dup = true
-			c.pubQueue = append(c.pubQueue, &copyMsg)
-			c.muQueue.Unlock()
-		}
+		copyMsg.Dup = true
+		c.pubQueue = append(c.pubQueue, &copyMsg)
 	}
 }
 
 func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, subs ...Subscription) {
-	if err := cli.Subscribe(ctx, subs...); err != nil {
-		select {
-		case <-ctx.Done():
-			if !retry {
-				// User cancelled; don't queue.
-				return
+	if len(c.subQueue) == 0 {
+		if err := cli.Subscribe(ctx, subs...); err != nil {
+			select {
+			case <-ctx.Done():
+				if !retry {
+					// User cancelled; don't queue.
+					return
+				}
+			default:
 			}
-		default:
+		} else {
+			subscriptions(subs).applyTo(&c.subEstablished)
+			return
 		}
-		c.muQueue.Lock()
-		c.subQueue = append(c.subQueue, subs)
-		c.muQueue.Unlock()
-	} else {
-		c.appendEstablished(subs...)
 	}
+	c.subQueue = append(c.subQueue, subscriptions(subs))
 }
 
 func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, topics ...string) {
-	if err := cli.Unsubscribe(ctx, topics...); err != nil {
-		select {
-		case <-ctx.Done():
-			if !retry {
-				// User cancelled; don't queue.
-				return
+	if len(c.subQueue) == 0 {
+		if err := cli.Unsubscribe(ctx, topics...); err != nil {
+			select {
+			case <-ctx.Done():
+				if !retry {
+					// User cancelled; don't queue.
+					return
+				}
+			default:
 			}
-		default:
-		}
-		c.muQueue.Lock()
-		c.unsubQueue = append(c.unsubQueue, topics)
-		c.muQueue.Unlock()
-	} else {
-		c.removeEstablished(topics...)
-	}
-}
-
-func (c *RetryClient) appendEstablished(subs ...Subscription) {
-	c.muQueue.Lock()
-	c.subEstablished = append(c.subEstablished, subs...)
-	c.muQueue.Unlock()
-}
-
-func (c *RetryClient) removeEstablished(topics ...string) {
-	c.muQueue.Lock()
-	l := len(c.subEstablished)
-	for _, topic := range topics {
-		for i, e := range c.subEstablished {
-			if e.Topic == topic {
-				l--
-				c.subEstablished[i] = c.subEstablished[l]
-				break
-			}
+		} else {
+			unsubscriptions(topics).applyTo(&c.subEstablished)
+			return
 		}
 	}
-	c.subEstablished = c.subEstablished[:l]
-	c.muQueue.Unlock()
+	c.subQueue = append(c.subQueue, unsubscriptions(topics))
 }
 
 // Disconnect from the broker.
@@ -246,46 +226,37 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 
 // Resubscribe subscribes all established subscriptions.
 func (c *RetryClient) Resubscribe(ctx context.Context) {
-	c.muQueue.Lock()
-	oldSubEstablished := append([]Subscription{}, c.subEstablished...)
-	c.subEstablished = nil
-	c.muQueue.Unlock()
+	c.pushTask(ctx, func(ctx context.Context, cli Client) {
+		oldSubEstablished := append([]Subscription{}, c.subEstablished...)
+		c.subEstablished = nil
 
-	if len(oldSubEstablished) > 0 {
-		c.mu.Lock()
-		cli := c.cli
-		c.mu.Unlock()
-		for _, sub := range oldSubEstablished {
-			c.subscribe(ctx, true, cli, sub)
+		if len(oldSubEstablished) > 0 {
+			for _, sub := range oldSubEstablished {
+				c.subscribe(ctx, true, cli, sub)
+			}
 		}
-	}
+	})
 }
 
 // Retry all queued publish/subscribe requests.
 func (c *RetryClient) Retry(ctx context.Context) {
-	c.mu.Lock()
-	cli := c.cli
-	c.mu.Unlock()
+	c.pushTask(ctx, func(ctx context.Context, cli Client) {
+		oldPubQueue := append([]*Message{}, c.pubQueue...)
+		oldSubQueue := append([]subTask{}, c.subQueue...)
+		c.pubQueue = nil
+		c.subQueue = nil
 
-	c.muQueue.Lock()
-	oldPubQueue := append([]*Message{}, c.pubQueue...)
-	oldSubQueue := append([][]Subscription{}, c.subQueue...)
-	oldUnsubQueue := append([][]string{}, c.unsubQueue...)
-	c.pubQueue = nil
-	c.subQueue = nil
-	c.unsubQueue = nil
-	c.muQueue.Unlock()
-
-	// Retry publish.
-	go func() {
+		// Retry publish.
 		for _, sub := range oldSubQueue {
-			c.subscribe(ctx, true, cli, sub...)
-		}
-		for _, unsub := range oldUnsubQueue {
-			c.unsubscribe(ctx, true, cli, unsub...)
+			switch s := sub.(type) {
+			case subscriptions:
+				c.subscribe(ctx, true, cli, s...)
+			case unsubscriptions:
+				c.unsubscribe(ctx, true, cli, s...)
+			}
 		}
 		for _, msg := range oldPubQueue {
 			c.publish(ctx, true, cli, msg)
 		}
-	}()
+	})
 }
