@@ -257,12 +257,19 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			received := make(map[byte]bool)
+			var receivedCnt byte
 			var mu sync.Mutex
 			cliRecv.Handle(HandlerFunc(func(msg *Message) {
 				mu.Lock()
 				defer mu.Unlock()
-				received[msg.Payload[0]] = true
+				if msg.Payload[0] > receivedCnt {
+					// Ignore retained messages
+					return
+				}
+				if msg.Payload[0] != receivedCnt {
+					t.Errorf("%d-th message is expected to be %d, got %d", receivedCnt, receivedCnt, msg.Payload[0])
+				}
+				receivedCnt++
 			}))
 
 			var sw int32
@@ -339,9 +346,9 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 			for {
 				time.Sleep(50 * time.Millisecond)
 				mu.Lock()
-				n := len(received)
+				n := receivedCnt
 				mu.Unlock()
-				if n == 10 {
+				if n >= 10 {
 					break
 				}
 			}
@@ -351,8 +358,8 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 
 			mu.Lock()
 			defer mu.Unlock()
-			if len(received) != 10 {
-				t.Errorf("Messages lost on retry, sent: 10, got: %d\n%v", len(received), received)
+			if receivedCnt != 10 {
+				t.Errorf("Messages lost on retry, sent: 10, got: %d", receivedCnt)
 			}
 		})
 	}
@@ -414,12 +421,16 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			received := make(map[byte]bool)
+			var received bool
 			var mu sync.Mutex
 			cli.Handle(HandlerFunc(func(msg *Message) {
 				mu.Lock()
 				defer mu.Unlock()
-				received[msg.Payload[0]] = true
+				if msg.Payload[0] != 0 {
+					t.Errorf("Message byte is expected to be 0, got %d", msg.Payload[0])
+				} else {
+					received = true
+				}
 			}))
 
 			cli.Connect(ctx, "RetryClientSub"+name)
@@ -485,8 +496,8 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 
 			mu.Lock()
 			defer mu.Unlock()
-			if len(received) != 1 {
-				t.Errorf("Expected to receive one messages, got: %d\n%v", len(received), received)
+			if !received {
+				t.Error("Expected to receive one message, but not received")
 			}
 		})
 	}
