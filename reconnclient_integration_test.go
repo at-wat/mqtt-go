@@ -421,15 +421,16 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			var receivedCnt byte
+			var received bool
 			var mu sync.Mutex
 			cli.Handle(HandlerFunc(func(msg *Message) {
 				mu.Lock()
 				defer mu.Unlock()
 				if msg.Payload[0] != 0 {
 					t.Errorf("Message byte is expected to be 0, got %d", msg.Payload[0])
+				} else {
+					received = true
 				}
-				receivedCnt++
 			}))
 
 			cli.Connect(ctx, "RetryClientSub"+name)
@@ -495,8 +496,8 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 
 			mu.Lock()
 			defer mu.Unlock()
-			if receivedCnt != 1 {
-				t.Errorf("Expected to receive one messages, got: %d", receivedCnt)
+			if !received {
+				t.Error("Expected to receive one message, but not received")
 			}
 		})
 	}
