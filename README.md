@@ -4,21 +4,21 @@
 
 ## Yet another Go MQTT 3.1.1 client library
 
-Thread safe and context controlled MQTT 3.1.1 client library.
-
+- Go-ish interface
+    Fully context controlled and mockable interface.
+- Extensible
+    Easy to implement a wrapper with unified interface. e.g. AWS IoT WebSocket dialer with automatic presign URL updater is available: [AWS IoT Device SDK for Go](https://github.com/seqsense/aws-iot-device-sdk-go)
+- Thread-safe
+    All functions and structs are safe to be used from multiple goroutines.
 
 ## Examples
 
 - [MQTTs with client certificate](examples/mqtts-client-cert)
 - [WebSockets with presigned URL](examples/wss-presign-url)
 
-## Related libraries
-
-- [AWS IoT Device SDK for Go (helper to connect to AWS IoT WebSocket endpoint)](https://github.com/seqsense/aws-iot-device-sdk-go)
-
 ## Reference
-- [MQTT Version 3.1.1 Plus Errata 01](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
 
+- [MQTT Version 3.1.1 Plus Errata 01](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
 
 ## License
 
