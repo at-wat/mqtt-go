@@ -12,6 +12,9 @@ Thread safe and context controlled MQTT 3.1.1 client library.
 - [MQTTs with client certificate](examples/mqtts-client-cert)
 - [WebSockets with presigned URL](examples/wss-presign-url)
 
+## Related libraries
+
+- [AWS IoT Device SDK for Go (helper to connect to AWS IoT WebSocket endpoint)](https://github.com/seqsense/aws-iot-device-sdk-go)
 
 ## Reference
 - [MQTT Version 3.1.1 Plus Errata 01](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
