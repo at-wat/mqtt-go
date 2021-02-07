@@ -5,11 +5,11 @@
 ## Yet another Go MQTT 3.1.1 client library
 
 - Go-ish interface
-      Fully context controlled and mockable interface.
+  > Fully context controlled and mockable interface.
 - Extensible
-      Easy to implement a wrapper with unified interface. e.g. AWS IoT WebSocket dialer with automatic presign URL updater is available: [AWS IoT Device SDK for Go](https://github.com/seqsense/aws-iot-device-sdk-go)
+  > Easy to implement a wrapper with unified interface. e.g. AWS IoT WebSocket dialer with automatic presign URL updater is available: [AWS IoT Device SDK for Go](https://github.com/seqsense/aws-iot-device-sdk-go)
 - Thread-safe
-      All functions and structs are safe to be used from multiple goroutines.
+  > All functions and structs are safe to be used from multiple goroutines.
 
 ## Examples
 
