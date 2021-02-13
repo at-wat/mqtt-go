@@ -719,11 +719,10 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						}
 					}()
 
-					for i := 0; i < 255; i++ {
+					for i := 0; i < 256; i++ {
 						if err := cli.Publish(ctx, &Message{
 							Topic:   topic,
 							QoS:     qos,
-							Retain:  true,
 							Payload: []byte{byte(i)},
 						}); err != nil {
 							t.Fatalf("Unexpected error: '%v'", err)
@@ -733,7 +732,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 
 					time.Sleep(time.Second)
 
-					for i := 0; i < 255; i++ {
+					for i := 0; i < 256; i++ {
 						switch qos {
 						case QoS1:
 							if received[byte(i)] < 1 {
