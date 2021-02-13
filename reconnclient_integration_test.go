@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -642,4 +643,112 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 	}
 
 	cli.Disconnect(ctx)
+}
+
+func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
+	for _, qos := range []QoS{QoS1, QoS2} {
+		qos := qos
+		t.Run(fmt.Sprintf("QoS%d", qos), func(t *testing.T) {
+			for name, url := range urls {
+				url := url
+				t.Run(name, func(t *testing.T) {
+					if name == "WebSocket" || name == "WebSockets" {
+						// WebSocket requires longer time to connect.
+						t.SkipNow()
+					}
+
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+
+					cliRaw, err := Dial(
+						url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if _, err = cliRaw.Connect(ctx,
+						"ReconnectClient2Raw"+name,
+					); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					cli, err := NewReconnectClient(
+						&URLDialer{
+							URL: url,
+							Options: []DialOption{
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							},
+						},
+						WithPingInterval(time.Second),
+						WithTimeout(time.Second),
+						WithReconnectWait(time.Millisecond, time.Millisecond),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					_, err = cli.Connect(
+						ctx,
+						"ReconnectClient2"+name,
+						WithKeepAlive(10),
+						WithCleanSession(true),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					topic := fmt.Sprintf("test_%d_%s", qos, name)
+
+					received := make(map[byte]int)
+					cliRaw.Handle(HandlerFunc(func(msg *Message) {
+						received[msg.Payload[0]]++
+					}))
+					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					go func() {
+						for {
+							// Close underlying client.
+							select {
+							case <-time.After(10 * time.Millisecond):
+							case <-ctx.Done():
+								return
+							}
+							cli.(*reconnectClient).cli.(ClientCloser).Close()
+						}
+					}()
+
+					for i := 0; i < 255; i++ {
+						if err := cli.Publish(ctx, &Message{
+							Topic:   topic,
+							QoS:     qos,
+							Retain:  true,
+							Payload: []byte{byte(i)},
+						}); err != nil {
+							t.Fatalf("Unexpected error: '%v'", err)
+						}
+						time.Sleep(time.Millisecond)
+					}
+
+					time.Sleep(time.Second)
+
+					for i := 0; i < 255; i++ {
+						switch qos {
+						case QoS1:
+							if received[byte(i)] < 1 {
+								t.Errorf("Expected number of received packets #%d: >=%d, got: %d", i, 1, received[byte(i)])
+							}
+						case QoS2:
+							if received[byte(i)] != 1 {
+								t.Errorf("Expected number of received packets #%d: %d, got: %d", i, 1, received[byte(i)])
+							}
+						}
+					}
+
+					cli.Disconnect(ctx)
+				})
+			}
+		})
+	}
 }
