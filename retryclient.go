@@ -25,14 +25,14 @@ var ErrClosedClient = errors.New("operation on closed client")
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	cli ClientCloser
+	cli *BaseClient
 
 	retryQueue     []retryFn
 	subEstablished subscriptions // acknoledged subscriptions
 	mu             sync.Mutex
 	handler        Handler
 	chTask         chan struct{}
-	taskQueue      []func(ctx context.Context, cli Client)
+	taskQueue      []func(ctx context.Context, cli *BaseClient)
 }
 
 // Handle registers the message handler.
@@ -52,12 +52,10 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	cli := c.cli
 	c.mu.Unlock()
 
-	if cli, ok := cli.(*BaseClient); ok {
-		if err := cli.ValidateMessage(message); err != nil {
-			return wrapError(err, "validating publishing message")
-		}
+	if err := cli.ValidateMessage(message); err != nil {
+		return wrapError(err, "validating publishing message")
 	}
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		c.publish(ctx, false, cli, message)
 	}), "retryclient: publishing")
 }
@@ -65,7 +63,7 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 // Subscribe tries to subscribe the topic and immediately return nil.
 // If it is not acknowledged to be subscribed, the request will be queued.
 func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		c.subscribe(ctx, false, cli, subs...)
 	}), "retryclient: subscribing")
 }
@@ -73,19 +71,19 @@ func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error
 // Unsubscribe tries to unsubscribe the topic and immediately return nil.
 // If it is not acknowledged to be unsubscribed, the request will be queued.
 func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		c.unsubscribe(ctx, false, cli, topics...)
 	}), "retryclient: unsubscribing")
 }
 
-func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, message *Message) {
-	publish := func(ctx context.Context, cli Client, message *Message) {
+func (c *RetryClient) publish(ctx context.Context, retry bool, cli *BaseClient, message *Message) {
+	publish := func(ctx context.Context, cli *BaseClient, message *Message) error {
 		if err := cli.Publish(ctx, message); err != nil {
 			select {
 			case <-ctx.Done():
 				if !retry {
 					// User cancelled; don't queue.
-					return
+					return ctx.Err()
 				}
 			default:
 			}
@@ -93,6 +91,7 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, messa
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
 			}
 		}
+		return nil
 	}
 
 	if len(c.retryQueue) == 0 {
@@ -103,22 +102,21 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, messa
 	if message.QoS > QoS0 {
 		copyMsg := *message
 		c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
-			publish(ctx, cli, &copyMsg)
-			return nil
+			return publish(ctx, cli, &copyMsg)
 		})
 	}
 	return
 }
 
-func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, subs ...Subscription) {
-	subscribe := func(ctx context.Context, cli Client) {
+func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient, subs ...Subscription) {
+	subscribe := func(ctx context.Context, cli *BaseClient) error {
 		subscriptions(subs).applyTo(&c.subEstablished)
 		if err := cli.Subscribe(ctx, subs...); err != nil {
 			select {
 			case <-ctx.Done():
 				if !retry {
 					// User cancelled; don't queue.
-					return
+					return ctx.Err()
 				}
 			default:
 			}
@@ -126,6 +124,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, sub
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
 			}
 		}
+		return nil
 	}
 
 	if len(c.retryQueue) == 0 {
@@ -133,10 +132,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, sub
 		return
 	}
 
-	c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
-		subscribe(ctx, cli)
-		return nil
-	})
+	c.retryQueue = append(c.retryQueue, subscribe)
 }
 
 func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, topics ...string) {
@@ -169,7 +165,7 @@ func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, t
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		cli.Disconnect(ctx)
 	}), "retryclient: disconnecting")
 }
@@ -183,7 +179,7 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 }
 
 // Client returns the base client.
-func (c *RetryClient) Client() ClientCloser {
+func (c *RetryClient) Client() *BaseClient {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.cli
@@ -191,7 +187,7 @@ func (c *RetryClient) Client() ClientCloser {
 
 // SetClient sets the new Client.
 // Call Retry() and Resubscribe() to process queued messages and subscriptions.
-func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
+func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	c.mu.Lock()
 	c.cli = cli
 	c.mu.Unlock()
@@ -223,7 +219,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 	}()
 }
 
-func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Context, cli Client)) error {
+func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Context, cli *BaseClient)) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -257,7 +253,7 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 
 // Resubscribe subscribes all established subscriptions.
 func (c *RetryClient) Resubscribe(ctx context.Context) {
-	c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		oldSubEstablished := append([]Subscription{}, c.subEstablished...)
 		c.subEstablished = nil
 
@@ -270,16 +266,13 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 }
 
 // Retry all queued publish/subscribe requests.
-// Underlaying Client must be *BaseClient to retry.
 func (c *RetryClient) Retry(ctx context.Context) {
-	c.pushTask(ctx, func(ctx context.Context, cli Client) {
+	c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		oldRetryQueue := append([]retryFn{}, c.retryQueue...)
 		c.retryQueue = nil
 
-		baseCli := c.cli.(*BaseClient)
-
 		for _, retry := range oldRetryQueue {
-			retry(ctx, baseCli)
+			retry(ctx, cli)
 		}
 	})
 }

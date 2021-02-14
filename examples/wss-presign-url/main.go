@@ -38,7 +38,7 @@ func main() {
 
 	cli, err := mqtt.NewReconnectClient(
 		// Dialer to connect/reconnect to the server.
-		mqtt.DialerFunc(func() (mqtt.ClientCloser, error) {
+		mqtt.DialerFunc(func() (*mqtt.BaseClient, error) {
 			// Presign URL here.
 			url := fmt.Sprintf("wss://%s:9443?token=%x",
 				host, time.Now().UnixNano(),
