@@ -47,6 +47,10 @@ func (t *token) WaitTimeout(d time.Duration) bool {
 	}
 }
 
+func (t *token) Done() <-chan struct{} {
+	return t.done
+}
+
 func (t *token) Error() error {
 	return t.err
 }
