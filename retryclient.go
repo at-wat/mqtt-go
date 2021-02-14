@@ -77,13 +77,13 @@ func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
 }
 
 func (c *RetryClient) publish(ctx context.Context, retry bool, cli *BaseClient, message *Message) {
-	publish := func(ctx context.Context, cli *BaseClient, message *Message) error {
+	publish := func(ctx context.Context, cli *BaseClient, message *Message) {
 		if err := cli.Publish(ctx, message); err != nil {
 			select {
 			case <-ctx.Done():
 				if !retry {
 					// User cancelled; don't queue.
-					return ctx.Err()
+					return
 				}
 			default:
 			}
@@ -91,7 +91,7 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli *BaseClient, 
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
 			}
 		}
-		return nil
+		return
 	}
 
 	if len(c.retryQueue) == 0 {
@@ -102,7 +102,8 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli *BaseClient, 
 	if message.QoS > QoS0 {
 		copyMsg := *message
 		c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
-			return publish(ctx, cli, &copyMsg)
+			publish(ctx, cli, &copyMsg)
+			return nil
 		})
 	}
 	return
@@ -116,11 +117,12 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 			case <-ctx.Done():
 				if !retry {
 					// User cancelled; don't queue.
+					return nil
 				}
 			default:
-				if retryErr, ok := err.(ErrorWithRetry); ok {
-					c.retryQueue = append(c.retryQueue, retryErr.retry)
-				}
+			}
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
 			}
 		}
 		return nil
@@ -142,11 +144,12 @@ func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli *BaseClie
 			case <-ctx.Done():
 				if !retry {
 					// User cancelled; don't queue.
+					return nil
 				}
 			default:
-				if retryErr, ok := err.(ErrorWithRetry); ok {
-					c.retryQueue = append(c.retryQueue, retryErr.retry)
-				}
+			}
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
 			}
 		}
 		return nil
