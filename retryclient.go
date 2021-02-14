@@ -27,8 +27,7 @@ var ErrClosedClient = errors.New("operation on closed client")
 type RetryClient struct {
 	cli ClientCloser
 
-	pubQueue       []*Message    // unacknoledged messages
-	subQueue       []subTask     // unacknoledged subscriptions
+	retryQueue     []retryFn
 	subEstablished subscriptions // acknoledged subscriptions
 	mu             sync.Mutex
 	handler        Handler
@@ -76,7 +75,7 @@ func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
 }
 
 func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, message *Message) {
-	if len(c.pubQueue) == 0 {
+	publish := func(ctx context.Context, cli Client, message *Message) {
 		if err := cli.Publish(ctx, message); err != nil {
 			select {
 			case <-ctx.Done():
@@ -86,20 +85,30 @@ func (c *RetryClient) publish(ctx context.Context, retry bool, cli Client, messa
 				}
 			default:
 			}
-		} else {
-			return
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
+			}
 		}
 	}
+
+	if len(c.retryQueue) == 0 {
+		publish(ctx, cli, message)
+		return
+	}
+
 	if message.QoS > QoS0 {
 		copyMsg := *message
-
-		copyMsg.Dup = true
-		c.pubQueue = append(c.pubQueue, &copyMsg)
+		c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
+			publish(ctx, cli, &copyMsg)
+			return nil
+		})
 	}
+	return
 }
 
 func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, subs ...Subscription) {
-	if len(c.subQueue) == 0 {
+	subscribe := func(ctx context.Context, cli Client) {
+		subscriptions(subs).applyTo(&c.subEstablished)
 		if err := cli.Subscribe(ctx, subs...); err != nil {
 			select {
 			case <-ctx.Done():
@@ -109,16 +118,26 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli Client, sub
 				}
 			default:
 			}
-		} else {
-			subscriptions(subs).applyTo(&c.subEstablished)
-			return
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
+			}
 		}
 	}
-	c.subQueue = append(c.subQueue, subscriptions(subs))
+
+	if len(c.retryQueue) == 0 {
+		subscribe(ctx, cli)
+		return
+	}
+
+	c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
+		subscribe(ctx, cli)
+		return nil
+	})
 }
 
 func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, topics ...string) {
-	if len(c.subQueue) == 0 {
+	unsubscribe := func(ctx context.Context, cli Client) {
+		unsubscriptions(topics).applyTo(&c.subEstablished)
 		if err := cli.Unsubscribe(ctx, topics...); err != nil {
 			select {
 			case <-ctx.Done():
@@ -128,12 +147,20 @@ func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli Client, t
 				}
 			default:
 			}
-		} else {
-			unsubscriptions(topics).applyTo(&c.subEstablished)
-			return
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
+			}
 		}
 	}
-	c.subQueue = append(c.subQueue, unsubscriptions(topics))
+
+	if len(c.retryQueue) == 0 {
+		unsubscribe(ctx, cli)
+	}
+
+	c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
+		unsubscribe(ctx, cli)
+		return nil
+	})
 }
 
 // Disconnect from the broker.
@@ -239,24 +266,16 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 }
 
 // Retry all queued publish/subscribe requests.
+// Underlaying Client must be *BaseClient to retry.
 func (c *RetryClient) Retry(ctx context.Context) {
 	c.pushTask(ctx, func(ctx context.Context, cli Client) {
-		oldPubQueue := append([]*Message{}, c.pubQueue...)
-		oldSubQueue := append([]subTask{}, c.subQueue...)
-		c.pubQueue = nil
-		c.subQueue = nil
+		oldRetryQueue := append([]retryFn{}, c.retryQueue...)
+		c.retryQueue = nil
 
-		// Retry publish.
-		for _, sub := range oldSubQueue {
-			switch s := sub.(type) {
-			case subscriptions:
-				c.subscribe(ctx, true, cli, s...)
-			case unsubscriptions:
-				c.unsubscribe(ctx, true, cli, s...)
-			}
-		}
-		for _, msg := range oldPubQueue {
-			c.publish(ctx, true, cli, msg)
+		baseCli := c.cli.(*BaseClient)
+
+		for _, retry := range oldRetryQueue {
+			retry(ctx, baseCli)
 		}
 	})
 }

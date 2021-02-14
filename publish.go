@@ -126,6 +126,10 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		return err
 	}
 
+	return publishImpl(ctx, c, message)
+}
+
+func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
@@ -135,7 +139,6 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 
 	var chPubAck chan *pktPubAck
 	var chPubRec chan *pktPubRec
-	var chPubComp chan *pktPubComp
 	switch message.QoS {
 	case QoS1:
 		chPubAck = make(chan *pktPubAck, 1)
@@ -147,51 +150,67 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		c.sig.mu.Unlock()
 	case QoS2:
 		chPubRec = make(chan *pktPubRec, 1)
-		chPubComp = make(chan *pktPubComp, 1)
 		c.sig.mu.Lock()
 		if c.sig.chPubRec == nil {
 			c.sig.chPubRec = make(map[uint16]chan *pktPubRec, 1)
 		}
 		c.sig.chPubRec[message.ID] = chPubRec
-		if c.sig.chPubComp == nil {
-			c.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
-		}
-		c.sig.chPubComp[message.ID] = chPubComp
 		c.sig.mu.Unlock()
+	}
+
+	retryPublish := func(ctx context.Context, cli *BaseClient) error {
+		return publishImpl(ctx, cli, message)
 	}
 
 	pkt := (&pktPublish{Message: message}).Pack()
 	if err := c.write(pkt); err != nil {
+		if message.QoS > QoS0 {
+			return wrapErrorWithRetry(err, retryPublish, "sending PUBLISH")
+		}
 		return wrapError(err, "sending PUBLISH")
 	}
 	switch message.QoS {
 	case QoS1:
 		select {
 		case <-c.connClosed:
-			return wrapError(ErrClosedTransport, "waiting PUBACK")
+			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBACK")
 		case <-ctx.Done():
-			return wrapError(ctx.Err(), "waiting PUBACK")
+			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBACK")
 		case <-chPubAck:
 		}
 	case QoS2:
 		select {
 		case <-c.connClosed:
-			return wrapError(ErrClosedTransport, "waiting PUBREC")
+			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBREC")
 		case <-ctx.Done():
-			return wrapError(ctx.Err(), "waiting PUBREC")
+			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBREC")
 		case <-chPubRec:
 		}
-		pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
-		if err := c.write(pktPubRel); err != nil {
-			return wrapError(err, "sending PUBREL")
+
+		var retryPublish2 func(ctx context.Context, cli *BaseClient) error
+		retryPublish2 = func(ctx context.Context, cli *BaseClient) error {
+			chPubComp := make(chan *pktPubComp, 1)
+			c.sig.mu.Lock()
+			if c.sig.chPubComp == nil {
+				c.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
+			}
+			c.sig.chPubComp[message.ID] = chPubComp
+			c.sig.mu.Unlock()
+
+			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
+			if err := c.write(pktPubRel); err != nil {
+				return wrapErrorWithRetry(err, retryPublish, "sending PUBREL")
+			}
+			select {
+			case <-c.connClosed:
+				return wrapErrorWithRetry(ErrClosedTransport, retryPublish2, "waiting PUBCOMP")
+			case <-ctx.Done():
+				return wrapErrorWithRetry(ctx.Err(), retryPublish2, "waiting PUBCOMP")
+			case <-chPubComp:
+			}
+			return nil
 		}
-		select {
-		case <-c.connClosed:
-			return wrapError(ErrClosedTransport, "waiting PUBCOMP")
-		case <-ctx.Done():
-			return wrapError(ctx.Err(), "waiting PUBCOMP")
-		case <-chPubComp:
-		}
+		return retryPublish2(ctx, c)
 	}
 	return nil
 }
