@@ -38,7 +38,7 @@ func TestToken(t *testing.T) {
 	}
 	select {
 	case <-token.Done():
-		t.Errorf("Wait of unreleased token should not be returned.")
+		t.Error("Unreleased token should not be done.")
 	case <-time.After(10 * time.Millisecond):
 	}
 
@@ -55,6 +55,6 @@ func TestToken(t *testing.T) {
 	select {
 	case <-token.Done():
 	case <-time.After(10 * time.Millisecond):
-		t.Errorf("Wait of released token should be returned.")
+		t.Error("Released token should be done.")
 	}
 }
