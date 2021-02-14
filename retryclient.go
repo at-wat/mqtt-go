@@ -48,7 +48,11 @@ func (c *RetryClient) Handle(handler Handler) {
 // Publish tries to publish the message and immediately returns.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
-	if cli, ok := c.cli.(*BaseClient); ok {
+	c.mu.Lock()
+	cli := c.cli
+	c.mu.Unlock()
+
+	if cli, ok := cli.(*BaseClient); ok {
 		if err := cli.ValidateMessage(message); err != nil {
 			return wrapError(err, "validating publishing message")
 		}
@@ -189,8 +193,8 @@ func (c *RetryClient) Client() ClientCloser {
 // Call Retry() and Resubscribe() to process queued messages and subscriptions.
 func (c *RetryClient) SetClient(ctx context.Context, cli ClientCloser) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.cli = cli
+	c.mu.Unlock()
 
 	if c.chTask != nil {
 		return

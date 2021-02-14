@@ -699,8 +699,11 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 
 					topic := fmt.Sprintf("test_%d_%s", qos, name)
 
+					var mu sync.Mutex
 					received := make(map[byte]int)
 					cliRaw.Handle(HandlerFunc(func(msg *Message) {
+						mu.Lock()
+						defer mu.Unlock()
 						received[msg.Payload[0]]++
 					}))
 					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
@@ -708,14 +711,19 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					}
 
 					go func() {
+						cli := cli.(*reconnectClient)
 						for {
-							// Close underlying client.
+							cli.mu.Lock()
+							c := cli.cli
+							cli.mu.Unlock()
+
 							select {
 							case <-time.After(10 * time.Millisecond):
 							case <-ctx.Done():
 								return
 							}
-							cli.(*reconnectClient).cli.(ClientCloser).Close()
+							// Close underlying client.
+							c.Close()
 						}
 					}()
 
@@ -732,6 +740,8 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 
 					time.Sleep(time.Second)
 
+					mu.Lock()
+					defer mu.Unlock()
 					for i := 0; i < 256; i++ {
 						switch qos {
 						case QoS1:
