@@ -126,16 +126,17 @@ func (c *BaseClient) Publish(ctx context.Context, message *Message) error {
 		return err
 	}
 
-	return publishImpl(ctx, c, message)
+	return publishImpl(ctx, c, message, false)
 }
 
-func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
+func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool) error {
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
 	if message.ID == 0 {
 		message.ID = c.newID()
 	}
+	message.Dup = dup
 
 	var chPubAck chan *pktPubAck
 	var chPubRec chan *pktPubRec
@@ -159,7 +160,7 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 	}
 
 	retryPublish := func(ctx context.Context, cli *BaseClient) error {
-		return publishImpl(ctx, cli, message)
+		return publishImpl(ctx, cli, message, true)
 	}
 
 	println("sending PUBLISH", message.ID)
