@@ -657,11 +657,12 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 	for _, qos := range []QoS{QoS1, QoS2} {
 		qos := qos
-		t.Run(fmt.Sprintf("QoS%d", qos), func(t *testing.T) {
+		qosStr := fmt.Sprintf("QoS%d", qos)
+		t.Run(qosStr, func(t *testing.T) {
 			for name, url := range urls {
 				url := url
 				t.Run(name, func(t *testing.T) {
-					if name == "WebSocket" || name == "WebSockets" {
+					if name == "WebSocket" || name == "WebSockets" || name == "MQTT" {
 						// WebSocket requires longer time to connect.
 						t.SkipNow()
 					}
@@ -677,7 +678,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 					if _, err = cliRaw.Connect(ctx,
-						"ReconnectClient2Raw"+name,
+						"ReconnectClient2Raw"+name+qosStr,
 						WithCleanSession(true),
 					); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -699,7 +700,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					}
 					_, err = cli.Connect(
 						ctx,
-						"ReconnectClient2"+name,
+						"ReconnectClient2"+name+qosStr,
 						WithKeepAlive(10),
 						WithCleanSession(true),
 					)
@@ -716,9 +717,6 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						defer mu.Unlock()
 						received[msg.Payload[0]]++
 					}))
-					defer func() {
-						cliRaw.Disconnect(ctx)
-					}()
 					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
@@ -768,6 +766,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						}
 					}
 					cli.Disconnect(ctx)
+					cliRaw.Disconnect(ctx)
 				})
 			}
 		})
