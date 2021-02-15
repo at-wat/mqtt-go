@@ -716,6 +716,9 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						defer mu.Unlock()
 						received[msg.Payload[0]]++
 					}))
+					defer func() {
+						cliRaw.Disconnect(ctx)
+					}()
 					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
@@ -764,7 +767,6 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 							}
 						}
 					}
-
 					cli.Disconnect(ctx)
 				})
 			}
