@@ -162,21 +162,27 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 		return publishImpl(ctx, cli, message)
 	}
 
+	println("sending PUBLISH")
 	pkt := (&pktPublish{Message: message}).Pack()
 	if err := c.write(pkt); err != nil {
 		if message.QoS > QoS0 {
+			println("retry PUBLISH queuing")
 			return wrapErrorWithRetry(err, retryPublish, "sending PUBLISH")
 		}
+		println("retry PUBLISH aborted")
 		return wrapError(err, "sending PUBLISH")
 	}
 	switch message.QoS {
 	case QoS1:
 		select {
 		case <-c.connClosed:
+			println("retry PUBLISH queuing")
 			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBACK")
 		case <-ctx.Done():
+			println("retry PUBLISH queuing")
 			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBACK")
 		case <-chPubAck:
+			println("PUBLISH done")
 		}
 	case QoS2:
 		select {
