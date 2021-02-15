@@ -678,6 +678,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					}
 					if _, err = cliRaw.Connect(ctx,
 						"ReconnectClient2Raw"+name,
+						WithCleanSession(true),
 					); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
