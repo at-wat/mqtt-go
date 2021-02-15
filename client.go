@@ -40,7 +40,7 @@ type BaseClient struct {
 	connClosed   chan struct{}
 	muConnecting sync.RWMutex
 	muWrite      sync.Mutex
-	idLast       uint32
+	idLast       *uint32
 }
 
 // Handle registers the message handler.

@@ -19,7 +19,8 @@ import (
 )
 
 func TestBaseClient_IDIncrement(t *testing.T) {
-	c := &BaseClient{idLast: 0xFFFF}
+	var id uint32 = 0xFFFF
+	c := &BaseClient{idLast: &id}
 
 	// 0 is reserved for auto, next to 0xFFFF is 1
 	if id := c.newID(); id != 1 {
