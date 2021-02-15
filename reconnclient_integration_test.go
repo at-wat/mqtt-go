@@ -243,133 +243,154 @@ func newOnOffFilter(sw *int32) func([]byte) bool {
 }
 
 func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
-	for name, url := range urls {
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-			defer cancel()
+	for _, qos := range []QoS{QoS1, QoS2} {
+		qos := qos
+		qosStr := fmt.Sprintf("QoS%d", qos)
+		t.Run(qosStr, func(t *testing.T) {
+			for name, url := range urls {
+				t.Run(name, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+					defer cancel()
 
-			cliRecv, err := Dial(
-				url,
-				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			if _, err = cliRecv.Connect(ctx,
-				"RetryRecvClientPub"+name,
-			); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			if err := cliRecv.Subscribe(ctx, Subscription{
-				Topic: "test/Retry" + name,
-				QoS:   QoS1,
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-
-			var receivedCnt byte
-			var mu sync.Mutex
-			cliRecv.Handle(HandlerFunc(func(msg *Message) {
-				mu.Lock()
-				defer mu.Unlock()
-				if msg.Payload[0] > receivedCnt {
-					// Ignore retained messages
-					return
-				}
-				if msg.Payload[0] != receivedCnt {
-					t.Errorf("%d-th message is expected to be %d, got %d", receivedCnt, receivedCnt, msg.Payload[0])
-				}
-				receivedCnt++
-			}))
-
-			var sw int32
-			chConnected := make(chan struct{}, 1)
-
-			cli, err := NewReconnectClient(
-				DialerFunc(func() (*BaseClient, error) {
-					cli, err := Dial(url,
+					cliRecv, err := Dial(
+						url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
 					if err != nil {
-						return nil, err
+						t.Fatalf("Unexpected error: '%v'", err)
 					}
-					ca, cb := filteredpipe.DetectAndClosePipe(
-						newOnOffFilter(&sw),
-						newOnOffFilter(&sw),
+					if _, err = cliRecv.Connect(ctx,
+						"RetryRecvClientPub"+qosStr+name,
+					); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					topic := fmt.Sprintf("test/Retry_%s_%d", name, qos)
+
+					if err := cliRecv.Subscribe(ctx, Subscription{
+						Topic: topic,
+						QoS:   qos,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					var receivedCnt byte
+					var mu sync.Mutex
+					cliRecv.Handle(HandlerFunc(func(msg *Message) {
+						mu.Lock()
+						defer mu.Unlock()
+						if msg.Payload[0] > receivedCnt {
+							// Ignore retained messages.
+							return
+						}
+						if qos == QoS1 && msg.Payload[0] != receivedCnt {
+							// Allow duplication of QoS1 message.
+							t.Log("QoS1 message duplication is ignored.")
+							return
+						}
+						if msg.Payload[0] != receivedCnt {
+							t.Errorf("%d-th message is expected to be %d, got %d", receivedCnt, receivedCnt, msg.Payload[0])
+						}
+						receivedCnt++
+					}))
+
+					var sw int32
+					chConnected := make(chan struct{}, 1)
+
+					cli, err := NewReconnectClient(
+						DialerFunc(func() (*BaseClient, error) {
+							cli, err := Dial(url,
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							)
+							if err != nil {
+								return nil, err
+							}
+							ca, cb := filteredpipe.DetectAndClosePipe(
+								newOnOffFilter(&sw),
+								newOnOffFilter(&sw),
+							)
+							filteredpipe.Connect(ca, cli.Transport)
+							cli.Transport = cb
+							cli.ConnState = func(s ConnState, err error) {
+								if s == StateActive {
+									chConnected <- struct{}{}
+								}
+							}
+							return cli, nil
+						}),
+						WithPingInterval(250*time.Millisecond),
+						WithTimeout(250*time.Millisecond),
+						WithReconnectWait(200*time.Millisecond, time.Second),
 					)
-					filteredpipe.Connect(ca, cli.Transport)
-					cli.Transport = cb
-					cli.ConnState = func(s ConnState, err error) {
-						if s == StateActive {
-							chConnected <- struct{}{}
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					cli.Connect(ctx, "RetryClientPub"+name)
+
+					select {
+					case <-ctx.Done():
+						t.Fatalf("Unexpected error: '%v'", ctx.Err())
+					case <-chConnected:
+					}
+
+					for i := 0; i < 5; i++ {
+						if err := cli.Publish(ctx, &Message{
+							Topic:   topic,
+							QoS:     qos,
+							Retain:  true,
+							Payload: []byte{byte(i)},
+						}); err != nil {
+							t.Fatalf("Unexpected error: '%v'", err)
+						}
+						time.Sleep(10 * time.Millisecond)
+					}
+					// Disconnect
+					atomic.StoreInt32(&sw, 1)
+
+					for i := 5; i < 10; i++ {
+						if err := cli.Publish(ctx, &Message{
+							Topic:   topic,
+							QoS:     qos,
+							Retain:  true,
+							Payload: []byte{byte(i)},
+						}); err != nil {
+							t.Fatalf("Unexpected error: '%v'", err)
+						}
+						time.Sleep(10 * time.Millisecond)
+					}
+					// Connect
+					atomic.StoreInt32(&sw, 0)
+					select {
+					case <-ctx.Done():
+						t.Fatalf("Unexpected error: '%v'", ctx.Err())
+					case <-chConnected:
+					}
+					for {
+						time.Sleep(50 * time.Millisecond)
+						mu.Lock()
+						n := receivedCnt
+						mu.Unlock()
+						if n >= 10 {
+							break
 						}
 					}
-					return cli, nil
-				}),
-				WithPingInterval(250*time.Millisecond),
-				WithTimeout(250*time.Millisecond),
-				WithReconnectWait(200*time.Millisecond, time.Second),
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			cli.Connect(ctx, "RetryClientPub"+name)
 
-			select {
-			case <-ctx.Done():
-				t.Fatalf("Unexpected error: '%v'", ctx.Err())
-			case <-chConnected:
-			}
+					cli.Disconnect(ctx)
+					cliRecv.Disconnect(ctx)
 
-			for i := 0; i < 5; i++ {
-				if err := cli.Publish(ctx, &Message{
-					Topic:   "test/Retry" + name,
-					QoS:     QoS1,
-					Retain:  true,
-					Payload: []byte{byte(i)},
-				}); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-			// Disconnect
-			atomic.StoreInt32(&sw, 1)
-
-			for i := 5; i < 10; i++ {
-				if err := cli.Publish(ctx, &Message{
-					Topic:   "test/Retry" + name,
-					QoS:     QoS1,
-					Retain:  true,
-					Payload: []byte{byte(i)},
-				}); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-			// Connect
-			atomic.StoreInt32(&sw, 0)
-			select {
-			case <-ctx.Done():
-				t.Fatalf("Unexpected error: '%v'", ctx.Err())
-			case <-chConnected:
-			}
-			for {
-				time.Sleep(50 * time.Millisecond)
-				mu.Lock()
-				n := receivedCnt
-				mu.Unlock()
-				if n >= 10 {
-					break
-				}
-			}
-
-			cli.Disconnect(ctx)
-			cliRecv.Disconnect(ctx)
-
-			mu.Lock()
-			defer mu.Unlock()
-			if receivedCnt != 10 {
-				t.Errorf("Messages lost on retry, sent: 10, got: %d", receivedCnt)
+					mu.Lock()
+					defer mu.Unlock()
+					switch qos {
+					case QoS1:
+						if receivedCnt < 10 {
+							t.Errorf("Expected number of the messages: >=10, got: %d", receivedCnt)
+						}
+					case QoS2:
+						if receivedCnt != 10 {
+							t.Errorf("Expected number of the messages: 10, got: %d", receivedCnt)
+						}
+					}
+				})
 			}
 		})
 	}
