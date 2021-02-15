@@ -272,7 +272,10 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		c.retryQueue = nil
 
 		for _, retry := range oldRetryQueue {
-			retry(ctx, cli)
+			err := retry(ctx, cli)
+			if retryErr, ok := err.(ErrorWithRetry); ok {
+				c.retryQueue = append(c.retryQueue, retryErr.retry)
+			}
 		}
 	})
 }
