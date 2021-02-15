@@ -655,6 +655,7 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 }
 
 func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
+	const testCount = 128
 	for _, qos := range []QoS{QoS1, QoS2} {
 		qos := qos
 		qosStr := fmt.Sprintf("QoS%d", qos)
@@ -693,7 +694,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						},
 						WithPingInterval(time.Second),
 						WithTimeout(time.Second),
-						WithReconnectWait(time.Millisecond, time.Millisecond),
+						WithReconnectWait(10*time.Millisecond, 10*time.Millisecond),
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -729,7 +730,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 							cli.mu.Unlock()
 
 							select {
-							case <-time.After(10 * time.Millisecond):
+							case <-time.After(100 * time.Millisecond):
 							case <-ctx.Done():
 								return
 							}
@@ -738,7 +739,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						}
 					}()
 
-					for i := 0; i < 256; i++ {
+					for i := 0; i < testCount; i++ {
 						if err := cli.Publish(ctx, &Message{
 							Topic:   topic,
 							QoS:     qos,
@@ -746,14 +747,14 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						}); err != nil {
 							t.Fatalf("Unexpected error: '%v'", err)
 						}
-						time.Sleep(time.Millisecond)
+						time.Sleep(10 * time.Millisecond)
 					}
 
-					time.Sleep(time.Second)
+					time.Sleep(500 * time.Millisecond)
 
 					mu.Lock()
 					defer mu.Unlock()
-					for i := 0; i < 256; i++ {
+					for i := 0; i < testCount; i++ {
 						switch qos {
 						case QoS1:
 							if received[byte(i)] < 1 {
