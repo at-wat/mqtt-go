@@ -102,7 +102,7 @@ func main() {
 	)
 
 	// Subscribe two topics.
-	if err := cli.Subscribe(ctx,
+	if _, err := cli.Subscribe(ctx,
 		mqtt.Subscription{
 			Topic: "test",
 			QoS:   mqtt.QoS1,

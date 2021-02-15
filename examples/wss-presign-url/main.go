@@ -80,7 +80,7 @@ func main() {
 		}),
 	)
 
-	if err := cli.Subscribe(ctx,
+	if _, err := cli.Subscribe(ctx,
 		mqtt.Subscription{
 			Topic: "stop",
 			QoS:   mqtt.QoS1,

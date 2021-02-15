@@ -62,8 +62,9 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 
 // Subscribe tries to subscribe the topic and immediately return nil.
 // If it is not acknowledged to be subscribed, the request will be queued.
-func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
+// First return value ([]Subscription) is always nil.
+func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) ([]Subscription, error) {
+	return nil, wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		c.subscribe(ctx, false, cli, subs...)
 	}), "retryclient: subscribing")
 }
@@ -110,7 +111,7 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient, subs ...Subscription) {
 	subscribe := func(ctx context.Context, cli *BaseClient) error {
 		subscriptions(subs).applyTo(&c.subEstablished)
-		if err := cli.Subscribe(ctx, subs...); err != nil {
+		if _, err := cli.Subscribe(ctx, subs...); err != nil {
 			select {
 			case <-ctx.Done():
 				if !retry {

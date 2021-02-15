@@ -291,7 +291,7 @@ func (c *pahoWrapper) Subscribe(topic string, qos byte, callback paho.MessageHan
 			return
 		}
 
-		token.err = cli.Subscribe(
+		_, token.err = cli.Subscribe(
 			context.Background(),
 			mqtt.Subscription{
 				Topic: topic,
@@ -325,7 +325,7 @@ func (c *pahoWrapper) SubscribeMultiple(filters map[string]byte, callback paho.M
 			return
 		}
 
-		token.err = cli.Subscribe(context.Background(), subs...)
+		_, token.err = cli.Subscribe(context.Background(), subs...)
 		token.release()
 	}()
 	return token

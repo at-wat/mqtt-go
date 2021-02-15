@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -55,7 +56,7 @@ func ExampleClient() {
 	if _, err := cli.Connect(ctx, "TestClient", WithCleanSession(true)); err != nil {
 		panic(err)
 	}
-	if err := cli.Subscribe(ctx, Subscription{Topic: "test/topic", QoS: QoS1}); err != nil {
+	if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/topic", QoS: QoS1}); err != nil {
 		panic(err)
 	}
 
@@ -165,8 +166,13 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 					}))
 
 					topic := "test_pubsub_" + name
-					if err := cli.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
+					subs, err := cli.Subscribe(ctx, Subscription{Topic: topic, QoS: qos})
+					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					expectedSubs := []Subscription{{Topic: topic, QoS: qos}}
+					if !reflect.DeepEqual(expectedSubs, subs) {
+						t.Fatalf("Expected subscriptions: %v, actual: %v", expectedSubs, subs)
 					}
 
 					if err := cli.Publish(ctx, &Message{
@@ -216,8 +222,13 @@ func TestIntegration_SubscribeUnsubscribe(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
+			subs, err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2})
+			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			expectedSubs := []Subscription{{Topic: "test", QoS: QoS2}}
+			if !reflect.DeepEqual(expectedSubs, subs) {
+				t.Fatalf("Expected subscriptions: %v, actual: %v", expectedSubs, subs)
 			}
 
 			if err := cli.Unsubscribe(ctx, "test"); err != nil {
@@ -284,7 +295,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 				chReceived <- msg
 			}))
 
-			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS2}); err != nil {
 				b.Fatalf("Unexpected error: '%v'", err)
 			}
 

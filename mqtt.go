@@ -41,7 +41,7 @@ type Client interface {
 	Connect(ctx context.Context, clientID string, opts ...ConnectOption) (sessionPresent bool, err error)
 	Disconnect(ctx context.Context) error
 	Publish(ctx context.Context, message *Message) error
-	Subscribe(ctx context.Context, subs ...Subscription) error
+	Subscribe(ctx context.Context, subs ...Subscription) ([]Subscription, error)
 	Unsubscribe(ctx context.Context, subs ...string) error
 	Ping(ctx context.Context) error
 	Handle(Handler)
