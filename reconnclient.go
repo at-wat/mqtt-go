@@ -77,6 +77,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 		clean := connOptions.CleanSession
 		reconnWait := c.options.ReconnectWaitBase
 		for {
+			println("dialing")
 			if baseCli, err := c.dialer.Dial(); err == nil {
 				optsCurr := append([]ConnectOption{}, opts...)
 				optsCurr = append(optsCurr, WithCleanSession(clean))
@@ -84,7 +85,9 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 				c.RetryClient.SetClient(ctx, baseCli)
 
 				ctxTimeout, cancel := context.WithTimeout(ctx, c.options.Timeout)
+				println("connecting")
 				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
+					println("connected")
 					cancel()
 
 					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
