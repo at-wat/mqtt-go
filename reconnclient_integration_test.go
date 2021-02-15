@@ -662,7 +662,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 			for name, url := range urls {
 				url := url
 				t.Run(name, func(t *testing.T) {
-					if name == "WebSocket" || name == "WebSockets" || name == "MQTT" {
+					if name == "WebSocket" || name == "WebSockets" {
 						// WebSocket requires longer time to connect.
 						t.SkipNow()
 					}

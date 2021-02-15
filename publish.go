@@ -200,7 +200,7 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool)
 
 			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
 			if err := cli.write(pktPubRel); err != nil {
-				return wrapErrorWithRetry(err, retryPublish2, "sending PUBREL")
+				return wrapErrorWithRetry(err, retryPublish, "sending PUBREL")
 			}
 			select {
 			case <-cli.connClosed:
