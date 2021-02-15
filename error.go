@@ -26,7 +26,7 @@ import (
 // ErrorWithRetry is a error with packets which should be retransmitted.
 type ErrorWithRetry interface {
 	error
-	retry(context.Context, *BaseClient) error
+	Retry(context.Context, *BaseClient) error
 }
 
 type retryFn func(context.Context, *BaseClient) error
@@ -37,7 +37,7 @@ type errorWithRetry struct {
 	retryFn retryFn
 }
 
-func (e *errorWithRetry) retry(ctx context.Context, cli *BaseClient) error {
+func (e *errorWithRetry) Retry(ctx context.Context, cli *BaseClient) error {
 	return e.retryFn(ctx, cli)
 }
 

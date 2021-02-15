@@ -86,7 +86,7 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 			default:
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
-				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				c.retryQueue = append(c.retryQueue, retryErr.Retry)
 			}
 		}
 		return
@@ -120,7 +120,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 			default:
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
-				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				c.retryQueue = append(c.retryQueue, retryErr.Retry)
 			}
 		}
 		return nil
@@ -145,7 +145,7 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 			default:
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
-				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				c.retryQueue = append(c.retryQueue, retryErr.Retry)
 			}
 		}
 		return nil
@@ -270,7 +270,7 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		for _, retry := range oldRetryQueue {
 			err := retry(ctx, cli)
 			if retryErr, ok := err.(ErrorWithRetry); ok {
-				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				c.retryQueue = append(c.retryQueue, retryErr.Retry)
 				c.retryQueue = append(c.retryQueue, oldRetryQueue...)
 				break
 			}
