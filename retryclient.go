@@ -56,7 +56,7 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 		return wrapError(err, "validating publishing message")
 	}
 	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
-		c.publish(ctx, false, cli, message)
+		c.publish(ctx, cli, message)
 	}), "retryclient: publishing")
 }
 
@@ -72,34 +72,35 @@ func (c *RetryClient) Subscribe(ctx context.Context, subs ...Subscription) error
 // If it is not acknowledged to be unsubscribed, the request will be queued.
 func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
 	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
-		c.unsubscribe(ctx, false, cli, topics...)
+		c.unsubscribe(ctx, cli, topics...)
 	}), "retryclient: unsubscribing")
 }
 
-func (c *RetryClient) publish(ctx context.Context, retry bool, cli *BaseClient, message *Message) {
+func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Message) {
 	publish := func(ctx context.Context, cli *BaseClient, message *Message) {
 		if err := cli.Publish(ctx, message); err != nil {
 			select {
 			case <-ctx.Done():
-				if !retry {
-					// User cancelled; don't queue.
-					return
-				}
+				// User cancelled; don't queue.
+				return
 			default:
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				println("queue", len(c.retryQueue))
 			}
 		}
 		return
 	}
 
 	if len(c.retryQueue) == 0 {
+		println("publish now", cli)
 		publish(ctx, cli, message)
 		return
 	}
 
 	if message.QoS > QoS0 {
+		println("publish later", cli)
 		copyMsg := *message
 		c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
 			publish(ctx, cli, &copyMsg)
@@ -123,6 +124,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				println("queue", len(c.retryQueue))
 			}
 		}
 		return nil
@@ -136,20 +138,19 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 	c.retryQueue = append(c.retryQueue, subscribe)
 }
 
-func (c *RetryClient) unsubscribe(ctx context.Context, retry bool, cli *BaseClient, topics ...string) {
+func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics ...string) {
 	unsubscribe := func(ctx context.Context, cli *BaseClient) error {
 		unsubscriptions(topics).applyTo(&c.subEstablished)
 		if err := cli.Unsubscribe(ctx, topics...); err != nil {
 			select {
 			case <-ctx.Done():
-				if !retry {
-					// User cancelled; don't queue.
-					return nil
-				}
+				// User cancelled; don't queue.
+				return nil
 			default:
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				println("queue", len(c.retryQueue))
 			}
 		}
 		return nil
@@ -271,10 +272,14 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		oldRetryQueue := append([]retryFn{}, c.retryQueue...)
 		c.retryQueue = nil
 
+		println("retry", cli)
 		for _, retry := range oldRetryQueue {
 			err := retry(ctx, cli)
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
+				c.retryQueue = append(c.retryQueue, oldRetryQueue...)
+				println("queue", len(c.retryQueue))
+				break
 			}
 		}
 	})

@@ -195,28 +195,28 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 		case <-chPubRec:
 		}
 
-		var retryPublish2 func(ctx context.Context, cli *BaseClient) error
+		var retryPublish2 func(context.Context, *BaseClient) error
 		retryPublish2 = func(ctx context.Context, cli *BaseClient) error {
 			chPubComp := make(chan *pktPubComp, 1)
-			c.sig.mu.Lock()
-			if c.sig.chPubComp == nil {
-				c.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
+			cli.sig.mu.Lock()
+			if cli.sig.chPubComp == nil {
+				cli.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
 			}
-			c.sig.chPubComp[message.ID] = chPubComp
-			c.sig.mu.Unlock()
+			cli.sig.chPubComp[message.ID] = chPubComp
+			cli.sig.mu.Unlock()
 
-			println("sending PUBREL", message.ID)
+			println("sending PUBREL", message.ID, cli)
 			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
-			if err := c.write(pktPubRel); err != nil {
-				println("retry PUBREL queuing", message.ID)
+			if err := cli.write(pktPubRel); err != nil {
+				println("retry PUBREL queuing", err.Error(), message.ID)
 				return wrapErrorWithRetry(err, retryPublish2, "sending PUBREL")
 			}
 			select {
-			case <-c.connClosed:
-				println("retry PUBREL queuing", message.ID)
+			case <-cli.connClosed:
+				println("retry PUBREL queuing (closed)", message.ID)
 				return wrapErrorWithRetry(ErrClosedTransport, retryPublish2, "waiting PUBCOMP")
 			case <-ctx.Done():
-				println("retry PUBREL queuing", message.ID)
+				println("retry PUBREL queuing (cancel)", message.ID)
 				return wrapErrorWithRetry(ctx.Err(), retryPublish2, "waiting PUBCOMP")
 			case <-chPubComp:
 				println("PUBREL done", message.ID)
