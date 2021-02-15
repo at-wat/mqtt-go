@@ -124,101 +124,110 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 
 func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 	for name, url := range urls {
+		url := url
 		t.Run(name, func(t *testing.T) {
-			cases := map[string]struct {
-				out byte
-				in  byte
-			}{
-				"ConnAck":    {0x00, 0x20},
-				"Subscribe":  {0x80, 0x00},
-				"PublishOut": {0x30, 0x00},
-				"PubAck":     {0x00, 0x40},
-				"SubAck":     {0x00, 0x90},
-				"PublishIn":  {0x00, 0x30},
-			}
-			for pktName, head := range cases {
-				fIn, fOut := head.in, head.out
-				t.Run("StopAt"+pktName, func(t *testing.T) {
-					if pktName == "PublishOut" && name == "WebSockets" {
-						// Mosquitto doesn't publish the first retained message on
-						// reconnecting wss if the previous connection was aborted
-						// before PUBLISH packet.
-						// Other protocols work as expected.
-						t.SkipNow()
+			for dropName, dropCnt := range map[string]int32{
+				"DropOnce":  1,
+				"DropTwice": 2,
+			} {
+				dropCnt := dropCnt
+				t.Run(dropName, func(t *testing.T) {
+					cases := map[string]struct {
+						out byte
+						in  byte
+					}{
+						"ConnAck":    {0x00, 0x20},
+						"Subscribe":  {0x80, 0x00},
+						"PublishOut": {0x30, 0x00},
+						"PubAck":     {0x00, 0x40},
+						"SubAck":     {0x00, 0x90},
+						"PublishIn":  {0x00, 0x30},
 					}
+					for pktName, head := range cases {
+						fIn, fOut := head.in, head.out
+						t.Run("StopAt"+pktName, func(t *testing.T) {
+							if pktName == "PublishOut" && name == "WebSockets" {
+								// Mosquitto doesn't publish the first retained message on
+								// reconnecting wss if the previous connection was aborted
+								// before PUBLISH packet.
+								// Other protocols work as expected.
+								t.SkipNow()
+							}
 
-					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					defer cancel()
-					var dialCnt int32
+							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+							defer cancel()
+							var dialCnt int32
 
-					chReceived := make(chan *Message, 100)
-					cli, err := NewReconnectClient(
-						DialerFunc(func() (*BaseClient, error) {
-							cli, err := Dial(url,
-								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							chReceived := make(chan *Message, 100)
+							cli, err := NewReconnectClient(
+								DialerFunc(func() (*BaseClient, error) {
+									cli, err := Dial(url,
+										WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+									)
+									if err != nil {
+										return nil, err
+									}
+									cnt := atomic.AddInt32(&dialCnt, 1)
+									ca, cb := filteredpipe.DetectAndClosePipe(
+										newCloseFilter(fIn, cnt <= dropCnt),
+										newCloseFilter(fOut, cnt <= dropCnt),
+									)
+									filteredpipe.Connect(ca, cli.Transport)
+									cli.Transport = cb
+									return cli, nil
+								}),
+								WithPingInterval(250*time.Millisecond),
+								WithTimeout(250*time.Millisecond),
+								WithReconnectWait(200*time.Millisecond, time.Second),
 							)
 							if err != nil {
-								return nil, err
+								t.Fatalf("Unexpected error: '%v'", err)
 							}
-							cnt := atomic.AddInt32(&dialCnt, 1)
-							ca, cb := filteredpipe.DetectAndClosePipe(
-								newCloseFilter(fIn, cnt == 1),
-								newCloseFilter(fOut, cnt == 1),
+							_, err = cli.Connect(
+								ctx,
+								"ReconnectClient"+name+pktName,
 							)
-							filteredpipe.Connect(ca, cli.Transport)
-							cli.Transport = cb
-							return cli, nil
-						}),
-						WithPingInterval(250*time.Millisecond),
-						WithTimeout(250*time.Millisecond),
-						WithReconnectWait(200*time.Millisecond, time.Second),
-					)
-					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					_, err = cli.Connect(
-						ctx,
-						"ReconnectClient"+name+pktName,
-					)
-					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					cli.Handle(HandlerFunc(func(msg *Message) {
-						chReceived <- msg
-					}))
+							if err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
+							cli.Handle(HandlerFunc(func(msg *Message) {
+								chReceived <- msg
+							}))
 
-					if err := cli.Publish(ctx, &Message{
-						Topic:   "test/" + name + pktName,
-						QoS:     QoS1,
-						Retain:  true,
-						Payload: []byte("message"),
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					if err := cli.Subscribe(ctx, Subscription{
-						Topic: "test/" + name + pktName,
-						QoS:   QoS1,
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
+							if err := cli.Publish(ctx, &Message{
+								Topic:   "test/" + name + pktName,
+								QoS:     QoS1,
+								Retain:  true,
+								Payload: []byte("message"),
+							}); err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
+							if err := cli.Subscribe(ctx, Subscription{
+								Topic: "test/" + name + pktName,
+								QoS:   QoS1,
+							}); err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
 
-					for {
-						time.Sleep(50 * time.Millisecond)
-						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
-							break
-						}
-					}
+							for {
+								time.Sleep(50 * time.Millisecond)
+								if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+									break
+								}
+							}
 
-					select {
-					case <-ctx.Done():
-						t.Fatalf("Unexpected error: '%v'", ctx.Err())
-					case <-chReceived:
-					}
-					cli.Disconnect(ctx)
+							select {
+							case <-ctx.Done():
+								t.Fatalf("Unexpected error: '%v'", ctx.Err())
+							case <-chReceived:
+							}
+							cli.Disconnect(ctx)
 
-					cnt := atomic.LoadInt32(&dialCnt)
-					if cnt < 2 {
-						t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							cnt := atomic.LoadInt32(&dialCnt)
+							if cnt < 2 {
+								t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							}
+						})
 					}
 				})
 			}
