@@ -187,8 +187,10 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 	case QoS2:
 		select {
 		case <-c.connClosed:
+			println("retry PUBLISH queuing")
 			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBREC")
 		case <-ctx.Done():
+			println("retry PUBLISH queuing")
 			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBREC")
 		case <-chPubRec:
 		}
@@ -203,16 +205,21 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message) error {
 			c.sig.chPubComp[message.ID] = chPubComp
 			c.sig.mu.Unlock()
 
+			println("sending PUBREL")
 			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
 			if err := c.write(pktPubRel); err != nil {
+				println("retry PUBREL queuing")
 				return wrapErrorWithRetry(err, retryPublish, "sending PUBREL")
 			}
 			select {
 			case <-c.connClosed:
+				println("retry PUBREL queuing")
 				return wrapErrorWithRetry(ErrClosedTransport, retryPublish2, "waiting PUBCOMP")
 			case <-ctx.Done():
+				println("retry PUBREL queuing")
 				return wrapErrorWithRetry(ctx.Err(), retryPublish2, "waiting PUBCOMP")
 			case <-chPubComp:
+				println("PUBREL done")
 			}
 			return nil
 		}
