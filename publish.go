@@ -163,35 +163,27 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool)
 		return publishImpl(ctx, cli, message, true)
 	}
 
-	println("sending PUBLISH", message.ID)
 	pkt := (&pktPublish{Message: message}).Pack()
 	if err := c.write(pkt); err != nil {
 		if message.QoS > QoS0 {
-			println("retry PUBLISH queuing", message.ID)
 			return wrapErrorWithRetry(err, retryPublish, "sending PUBLISH")
 		}
-		println("retry PUBLISH aborted", message.ID)
 		return wrapError(err, "sending PUBLISH")
 	}
 	switch message.QoS {
 	case QoS1:
 		select {
 		case <-c.connClosed:
-			println("retry PUBLISH queuing", message.ID)
 			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBACK")
 		case <-ctx.Done():
-			println("retry PUBLISH queuing", message.ID)
 			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBACK")
 		case <-chPubAck:
-			println("PUBLISH done", message.ID)
 		}
 	case QoS2:
 		select {
 		case <-c.connClosed:
-			println("retry PUBLISH queuing", message.ID)
 			return wrapErrorWithRetry(ErrClosedTransport, retryPublish, "waiting PUBREC")
 		case <-ctx.Done():
-			println("retry PUBLISH queuing", message.ID)
 			return wrapErrorWithRetry(ctx.Err(), retryPublish, "waiting PUBREC")
 		case <-chPubRec:
 		}
@@ -206,21 +198,16 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool)
 			cli.sig.chPubComp[message.ID] = chPubComp
 			cli.sig.mu.Unlock()
 
-			println("sending PUBREL", message.ID, cli)
 			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
 			if err := cli.write(pktPubRel); err != nil {
-				println("retry PUBREL queuing", err.Error(), message.ID)
 				return wrapErrorWithRetry(err, retryPublish2, "sending PUBREL")
 			}
 			select {
 			case <-cli.connClosed:
-				println("retry PUBREL queuing (closed)", message.ID)
 				return wrapErrorWithRetry(ErrClosedTransport, retryPublish2, "waiting PUBCOMP")
 			case <-ctx.Done():
-				println("retry PUBREL queuing (cancel)", message.ID)
 				return wrapErrorWithRetry(ctx.Err(), retryPublish2, "waiting PUBCOMP")
 			case <-chPubComp:
-				println("PUBREL done", message.ID)
 			}
 			return nil
 		}

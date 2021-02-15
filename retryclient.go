@@ -87,20 +87,17 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
-				println("queue", len(c.retryQueue))
 			}
 		}
 		return
 	}
 
 	if len(c.retryQueue) == 0 {
-		println("publish now", cli)
 		publish(ctx, cli, message)
 		return
 	}
 
 	if message.QoS > QoS0 {
-		println("publish later", cli)
 		copyMsg := *message
 		c.retryQueue = append(c.retryQueue, func(ctx context.Context, cli *BaseClient) error {
 			publish(ctx, cli, &copyMsg)
@@ -124,7 +121,6 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
-				println("queue", len(c.retryQueue))
 			}
 		}
 		return nil
@@ -150,7 +146,6 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
-				println("queue", len(c.retryQueue))
 			}
 		}
 		return nil
@@ -272,13 +267,11 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		oldRetryQueue := append([]retryFn{}, c.retryQueue...)
 		c.retryQueue = nil
 
-		println("retry", cli)
 		for _, retry := range oldRetryQueue {
 			err := retry(ctx, cli)
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.retry)
 				c.retryQueue = append(c.retryQueue, oldRetryQueue...)
-				println("queue", len(c.retryQueue))
 				break
 			}
 		}
