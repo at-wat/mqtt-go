@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -64,7 +65,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 
 			// Close underlying client.
 			time.Sleep(time.Millisecond)
-			cli.(*reconnectClient).cli.(ClientCloser).Close()
+			cli.(*reconnectClient).cli.Close()
 
 			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -123,101 +124,110 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 
 func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 	for name, url := range urls {
+		url := url
 		t.Run(name, func(t *testing.T) {
-			cases := map[string]struct {
-				out byte
-				in  byte
-			}{
-				"ConnAck":    {0x00, 0x20},
-				"Subscribe":  {0x80, 0x00},
-				"PublishOut": {0x30, 0x00},
-				"PubAck":     {0x00, 0x40},
-				"SubAck":     {0x00, 0x90},
-				"PublishIn":  {0x00, 0x30},
-			}
-			for pktName, head := range cases {
-				fIn, fOut := head.in, head.out
-				t.Run("StopAt"+pktName, func(t *testing.T) {
-					if pktName == "PublishOut" && name == "WebSockets" {
-						// Mosquitto doesn't publish the first retained message on
-						// reconnecting wss if the previous connection was aborted
-						// before PUBLISH packet.
-						// Other protocols work as expected.
-						t.SkipNow()
+			for dropName, dropCnt := range map[string]int32{
+				"DropOnce":  1,
+				"DropTwice": 2,
+			} {
+				dropCnt := dropCnt
+				t.Run(dropName, func(t *testing.T) {
+					cases := map[string]struct {
+						out byte
+						in  byte
+					}{
+						"ConnAck":    {0x00, 0x20},
+						"Subscribe":  {0x80, 0x00},
+						"PublishOut": {0x30, 0x00},
+						"PubAck":     {0x00, 0x40},
+						"SubAck":     {0x00, 0x90},
+						"PublishIn":  {0x00, 0x30},
 					}
+					for pktName, head := range cases {
+						fIn, fOut := head.in, head.out
+						t.Run("StopAt"+pktName, func(t *testing.T) {
+							if pktName == "PublishOut" && name == "WebSockets" {
+								// Mosquitto doesn't publish the first retained message on
+								// reconnecting wss if the previous connection was aborted
+								// before PUBLISH packet.
+								// Other protocols work as expected.
+								t.SkipNow()
+							}
 
-					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					defer cancel()
-					var dialCnt int32
+							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+							defer cancel()
+							var dialCnt int32
 
-					chReceived := make(chan *Message, 100)
-					cli, err := NewReconnectClient(
-						DialerFunc(func() (ClientCloser, error) {
-							cli, err := Dial(url,
-								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							chReceived := make(chan *Message, 100)
+							cli, err := NewReconnectClient(
+								DialerFunc(func() (*BaseClient, error) {
+									cli, err := Dial(url,
+										WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+									)
+									if err != nil {
+										return nil, err
+									}
+									cnt := atomic.AddInt32(&dialCnt, 1)
+									ca, cb := filteredpipe.DetectAndClosePipe(
+										newCloseFilter(fIn, cnt <= dropCnt),
+										newCloseFilter(fOut, cnt <= dropCnt),
+									)
+									filteredpipe.Connect(ca, cli.Transport)
+									cli.Transport = cb
+									return cli, nil
+								}),
+								WithPingInterval(250*time.Millisecond),
+								WithTimeout(250*time.Millisecond),
+								WithReconnectWait(200*time.Millisecond, time.Second),
 							)
 							if err != nil {
-								return nil, err
+								t.Fatalf("Unexpected error: '%v'", err)
 							}
-							cnt := atomic.AddInt32(&dialCnt, 1)
-							ca, cb := filteredpipe.DetectAndClosePipe(
-								newCloseFilter(fIn, cnt == 1),
-								newCloseFilter(fOut, cnt == 1),
+							_, err = cli.Connect(
+								ctx,
+								"ReconnectClient"+name+pktName,
 							)
-							filteredpipe.Connect(ca, cli.Transport)
-							cli.Transport = cb
-							return cli, nil
-						}),
-						WithPingInterval(250*time.Millisecond),
-						WithTimeout(250*time.Millisecond),
-						WithReconnectWait(200*time.Millisecond, time.Second),
-					)
-					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					_, err = cli.Connect(
-						ctx,
-						"ReconnectClient"+name+pktName,
-					)
-					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					cli.Handle(HandlerFunc(func(msg *Message) {
-						chReceived <- msg
-					}))
+							if err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
+							cli.Handle(HandlerFunc(func(msg *Message) {
+								chReceived <- msg
+							}))
 
-					if err := cli.Publish(ctx, &Message{
-						Topic:   "test/" + name + pktName,
-						QoS:     QoS1,
-						Retain:  true,
-						Payload: []byte("message"),
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-					if err := cli.Subscribe(ctx, Subscription{
-						Topic: "test/" + name + pktName,
-						QoS:   QoS1,
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
+							if err := cli.Publish(ctx, &Message{
+								Topic:   "test/" + name + pktName,
+								QoS:     QoS1,
+								Retain:  true,
+								Payload: []byte("message"),
+							}); err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
+							if err := cli.Subscribe(ctx, Subscription{
+								Topic: "test/" + name + pktName,
+								QoS:   QoS1,
+							}); err != nil {
+								t.Fatalf("Unexpected error: '%v'", err)
+							}
 
-					for {
-						time.Sleep(50 * time.Millisecond)
-						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
-							break
-						}
-					}
+							for {
+								time.Sleep(50 * time.Millisecond)
+								if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+									break
+								}
+							}
 
-					select {
-					case <-ctx.Done():
-						t.Fatalf("Unexpected error: '%v'", ctx.Err())
-					case <-chReceived:
-					}
-					cli.Disconnect(ctx)
+							select {
+							case <-ctx.Done():
+								t.Fatalf("Unexpected error: '%v'", ctx.Err())
+							case <-chReceived:
+							}
+							cli.Disconnect(ctx)
 
-					cnt := atomic.LoadInt32(&dialCnt)
-					if cnt < 2 {
-						t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							cnt := atomic.LoadInt32(&dialCnt)
+							if cnt < 2 {
+								t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							}
+						})
 					}
 				})
 			}
@@ -276,7 +286,7 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 			chConnected := make(chan struct{}, 1)
 
 			cli, err := NewReconnectClient(
-				DialerFunc(func() (ClientCloser, error) {
+				DialerFunc(func() (*BaseClient, error) {
 					cli, err := Dial(url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
@@ -394,7 +404,7 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			chConnected := make(chan struct{}, 1)
 
 			cli, err := NewReconnectClient(
-				DialerFunc(func() (ClientCloser, error) {
+				DialerFunc(func() (*BaseClient, error) {
 					cli, err := Dial(url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
@@ -601,7 +611,7 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 	chErr := make(chan error)
 
 	cli, err := NewReconnectClient(
-		DialerFunc(func() (ClientCloser, error) {
+		DialerFunc(func() (*BaseClient, error) {
 			cli, err := Dial(urls["MQTT"],
 				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 			)
@@ -642,4 +652,124 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 	}
 
 	cli.Disconnect(ctx)
+}
+
+func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
+	const testCount = 128
+	for _, qos := range []QoS{QoS1, QoS2} {
+		qos := qos
+		qosStr := fmt.Sprintf("QoS%d", qos)
+		t.Run(qosStr, func(t *testing.T) {
+			for name, url := range urls {
+				url := url
+				t.Run(name, func(t *testing.T) {
+					if name == "WebSocket" || name == "WebSockets" {
+						// WebSocket requires longer time to connect.
+						t.SkipNow()
+					}
+
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+
+					cliRaw, err := Dial(
+						url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if _, err = cliRaw.Connect(ctx,
+						"ReconnectClient2Raw"+name+qosStr,
+						WithCleanSession(true),
+					); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					cli, err := NewReconnectClient(
+						&URLDialer{
+							URL: url,
+							Options: []DialOption{
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							},
+						},
+						WithPingInterval(time.Second),
+						WithTimeout(time.Second),
+						WithReconnectWait(10*time.Millisecond, 10*time.Millisecond),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					_, err = cli.Connect(
+						ctx,
+						"ReconnectClient2"+name+qosStr,
+						WithKeepAlive(10),
+						WithCleanSession(true),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					topic := fmt.Sprintf("test_%d_%s", qos, name)
+
+					var mu sync.Mutex
+					received := make(map[byte]int)
+					cliRaw.Handle(HandlerFunc(func(msg *Message) {
+						mu.Lock()
+						defer mu.Unlock()
+						received[msg.Payload[0]]++
+					}))
+					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					go func() {
+						cli := cli.(*reconnectClient)
+						for {
+							cli.mu.Lock()
+							c := cli.cli
+							cli.mu.Unlock()
+
+							select {
+							case <-time.After(100 * time.Millisecond):
+							case <-ctx.Done():
+								return
+							}
+							// Close underlying client.
+							c.Close()
+						}
+					}()
+
+					for i := 0; i < testCount; i++ {
+						if err := cli.Publish(ctx, &Message{
+							Topic:   topic,
+							QoS:     qos,
+							Payload: []byte{byte(i)},
+						}); err != nil {
+							t.Fatalf("Unexpected error: '%v'", err)
+						}
+						time.Sleep(10 * time.Millisecond)
+					}
+
+					time.Sleep(500 * time.Millisecond)
+
+					mu.Lock()
+					defer mu.Unlock()
+					for i := 0; i < testCount; i++ {
+						switch qos {
+						case QoS1:
+							if received[byte(i)] < 1 {
+								t.Errorf("Expected number of received packets #%d: >=%d, got: %d", i, 1, received[byte(i)])
+							}
+						case QoS2:
+							if received[byte(i)] != 1 {
+								t.Errorf("Expected number of received packets #%d: %d, got: %d", i, 1, received[byte(i)])
+							}
+						}
+					}
+					cli.Disconnect(ctx)
+					cliRaw.Disconnect(ctx)
+				})
+			}
+		})
+	}
 }

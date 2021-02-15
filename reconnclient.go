@@ -106,9 +106,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 								c.options.PingInterval,
 								c.options.Timeout,
 							); err != nil {
-								if cli, ok := c.Client().(*BaseClient); ok {
-									cli.SetErrorOnce(err)
-								}
+								c.Client().SetErrorOnce(err)
 								// The client should close the connection if PINGRESP is not returned.
 								// MQTT 3.1.1 spec. 3.1.2.10
 								baseCli.Close()

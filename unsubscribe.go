@@ -38,6 +38,10 @@ func (p *pktUnsubscribe) Pack() []byte {
 
 // Unsubscribe topics.
 func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
+	return unsubscribeImpl(ctx, c, subs...)
+}
+
+func unsubscribeImpl(ctx context.Context, c *BaseClient, subs ...string) error {
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
@@ -51,15 +55,19 @@ func (c *BaseClient) Unsubscribe(ctx context.Context, subs ...string) error {
 	c.sig.chUnsubAck[id] = chUnsubAck
 	c.sig.mu.Unlock()
 
+	retryUnsubscribe := func(ctx context.Context, cli *BaseClient) error {
+		return unsubscribeImpl(ctx, cli, subs...)
+	}
+
 	pkt := (&pktUnsubscribe{ID: id, Topics: subs}).Pack()
 	if err := c.write(pkt); err != nil {
-		return wrapError(err, "sending UNSUBSCRIBE")
+		return wrapErrorWithRetry(err, retryUnsubscribe, "sending UNSUBSCRIBE")
 	}
 	select {
 	case <-c.connClosed:
-		return wrapError(ErrClosedTransport, "waiting UNSUBACK")
+		return wrapErrorWithRetry(ErrClosedTransport, retryUnsubscribe, "waiting UNSUBACK")
 	case <-ctx.Done():
-		return wrapError(ctx.Err(), "waiting UNSUBACK")
+		return wrapErrorWithRetry(ctx.Err(), retryUnsubscribe, "waiting UNSUBACK")
 	case <-chUnsubAck:
 	}
 	return nil

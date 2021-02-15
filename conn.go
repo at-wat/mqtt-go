@@ -40,19 +40,19 @@ type URLDialer struct {
 
 // Dialer is an interface to create connection.
 type Dialer interface {
-	Dial() (ClientCloser, error)
+	Dial() (*BaseClient, error)
 }
 
 // DialerFunc type is an adapter to use functions as MQTT connection dialer.
-type DialerFunc func() (ClientCloser, error)
+type DialerFunc func() (*BaseClient, error)
 
 // Dial calls d().
-func (d DialerFunc) Dial() (ClientCloser, error) {
+func (d DialerFunc) Dial() (*BaseClient, error) {
 	return d()
 }
 
 // Dial creates connection using its values.
-func (d *URLDialer) Dial() (ClientCloser, error) {
+func (d *URLDialer) Dial() (*BaseClient, error) {
 	return Dial(d.URL, d.Options...)
 }
 

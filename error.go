@@ -15,12 +15,37 @@
 package mqtt
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
 	"runtime"
 )
+
+// ErrorWithRetry is a error with packets which should be retransmitted.
+type ErrorWithRetry interface {
+	error
+	Retry(context.Context, *BaseClient) error
+}
+
+type retryFn func(context.Context, *BaseClient) error
+
+type errorWithRetry struct {
+	errorInterface
+
+	retryFn retryFn
+}
+
+func (e *errorWithRetry) Retry(ctx context.Context, cli *BaseClient) error {
+	return e.retryFn(ctx, cli)
+}
+
+type errorInterface interface {
+	Error() string
+	Unwrap() error
+	Is(target error) bool
+}
 
 // Error records a failed parsing.
 type Error struct {
@@ -105,4 +130,20 @@ func wrapError(err error, failure string) error {
 
 func wrapErrorf(err error, failureFmt string, v ...interface{}) error {
 	return wrapErrorImpl(err, fmt.Sprintf(failureFmt, v...))
+}
+
+func wrapErrorWithRetry(err error, retry retryFn, failure string) error {
+	err2 := wrapErrorImpl(err, failure)
+	if err, ok := err2.(*Error); ok {
+		return &errorWithRetry{errorInterface: err, retryFn: retry}
+	}
+	return err2
+}
+
+func wrapErrorfWithRetry(err error, retry retryFn, failureFmt string, v ...interface{}) error {
+	err2 := wrapErrorImpl(err, fmt.Sprintf(failureFmt, v...))
+	if err, ok := err2.(*Error); ok {
+		return &errorWithRetry{errorInterface: err, retryFn: retry}
+	}
+	return err2
 }
