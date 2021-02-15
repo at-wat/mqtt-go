@@ -236,8 +236,7 @@ func TestConnectionError(t *testing.T) {
 	reqs := []func(ctx context.Context, cli *BaseClient) error{
 		func(ctx context.Context, cli *BaseClient) error {
 			_, err := cli.Connect(ctx, "cli")
-			var id uint32
-			cli.idLast = &id
+			cli.idLast = 0
 			return err
 		},
 		func(ctx context.Context, cli *BaseClient) error {
