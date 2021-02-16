@@ -165,7 +165,7 @@ func TestPacketSendCancel(t *testing.T) {
 	cancel()
 
 	t.Run("Subscribe", func(t *testing.T) {
-		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, context.Canceled) {
+		if _, err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, context.Canceled) {
 			t.Errorf("Expected error: '%v', got: '%v'", context.Canceled, err)
 		}
 	})
@@ -200,7 +200,7 @@ func TestPacketSendError(t *testing.T) {
 	ca.Close()
 
 	t.Run("Subscribe", func(t *testing.T) {
-		if err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, io.ErrClosedPipe) {
+		if _, err := cli.Subscribe(ctx, Subscription{Topic: "test"}); !errors.Is(err, io.ErrClosedPipe) {
 			t.Errorf("Expected error: '%v', got: '%v'", io.ErrClosedPipe, err)
 		}
 	})
@@ -240,7 +240,8 @@ func TestConnectionError(t *testing.T) {
 			return err
 		},
 		func(ctx context.Context, cli *BaseClient) error {
-			return cli.Subscribe(ctx, Subscription{Topic: "test"})
+			_, err := cli.Subscribe(ctx, Subscription{Topic: "test"})
+			return err
 		},
 		func(ctx context.Context, cli *BaseClient) error {
 			return cli.Unsubscribe(ctx, "test")

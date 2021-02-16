@@ -81,7 +81,7 @@ func TestIntegration_RetryClient_Cancel(t *testing.T) {
 	cliRecv.Handle(HandlerFunc(func(msg *Message) {
 		chRecv <- msg
 	}))
-	if err := cliRecv.Subscribe(ctx, Subscription{Topic: "testCancel", QoS: QoS2}); err != nil {
+	if _, err := cliRecv.Subscribe(ctx, Subscription{Topic: "testCancel", QoS: QoS2}); err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
@@ -151,7 +151,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			done()
 		}
 	}))
-	if err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+	if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(10 * time.Millisecond)

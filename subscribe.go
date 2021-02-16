@@ -61,11 +61,11 @@ func (p *pktSubscribe) Pack() []byte {
 }
 
 // Subscribe topics.
-func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) error {
+func (c *BaseClient) Subscribe(ctx context.Context, subs ...Subscription) ([]Subscription, error) {
 	return subscribeImpl(ctx, c, subs...)
 }
 
-func subscribeImpl(ctx context.Context, c *BaseClient, subs ...Subscription) error {
+func subscribeImpl(ctx context.Context, c *BaseClient, subs ...Subscription) ([]Subscription, error) {
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
@@ -80,26 +80,27 @@ func subscribeImpl(ctx context.Context, c *BaseClient, subs ...Subscription) err
 	c.sig.mu.Unlock()
 
 	retrySubscribe := func(ctx context.Context, cli *BaseClient) error {
-		return subscribeImpl(ctx, cli, subs...)
+		_, err := subscribeImpl(ctx, cli, subs...)
+		return err
 	}
 
 	pkt := (&pktSubscribe{ID: id, Subscriptions: subs}).Pack()
 	if err := c.write(pkt); err != nil {
-		return wrapErrorWithRetry(err, retrySubscribe, "sending SUBSCRIBE")
+		return nil, wrapErrorWithRetry(err, retrySubscribe, "sending SUBSCRIBE")
 	}
 	select {
 	case <-c.connClosed:
-		return wrapErrorWithRetry(ErrClosedTransport, retrySubscribe, "waiting SUBACK")
+		return nil, wrapErrorWithRetry(ErrClosedTransport, retrySubscribe, "waiting SUBACK")
 	case <-ctx.Done():
-		return wrapErrorWithRetry(ctx.Err(), retrySubscribe, "waiting SUBACK")
+		return nil, wrapErrorWithRetry(ctx.Err(), retrySubscribe, "waiting SUBACK")
 	case subAck := <-chSubAck:
 		if len(subAck.Codes) != len(subs) {
 			c.Transport.Close()
-			return wrapErrorf(ErrInvalidSubAck, "subscribing %d topics: %d topics in SUBACK", len(subs), len(subAck.Codes))
+			return nil, wrapErrorf(ErrInvalidSubAck, "subscribing %d topics: %d topics in SUBACK", len(subs), len(subAck.Codes))
 		}
 		for i := 0; i < len(subAck.Codes); i++ {
 			subs[i].QoS = QoS(subAck.Codes[i])
 		}
 	}
-	return nil
+	return subs, nil
 }

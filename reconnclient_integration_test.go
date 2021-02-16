@@ -67,7 +67,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 			time.Sleep(time.Millisecond)
 			cli.(*reconnectClient).cli.Close()
 
-			if err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test", QoS: QoS1}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 			if err := cli.Publish(ctx, &Message{
@@ -202,7 +202,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 							}); err != nil {
 								t.Fatalf("Unexpected error: '%v'", err)
 							}
-							if err := cli.Subscribe(ctx, Subscription{
+							if _, err := cli.Subscribe(ctx, Subscription{
 								Topic: "test/" + name + pktName,
 								QoS:   QoS1,
 							}); err != nil {
@@ -267,7 +267,7 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 
 					topic := fmt.Sprintf("test/Retry_%s_%d", name, qos)
 
-					if err := cliRecv.Subscribe(ctx, Subscription{
+					if _, err := cliRecv.Subscribe(ctx, Subscription{
 						Topic: topic,
 						QoS:   qos,
 					}); err != nil {
@@ -739,7 +739,7 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						defer mu.Unlock()
 						received[msg.Payload[0]]++
 					}))
-					if err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
+					if _, err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 

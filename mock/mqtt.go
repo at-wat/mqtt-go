@@ -27,7 +27,7 @@ type Client struct {
 	ConnectFn     func(ctx context.Context, clientID string, opts ...mqtt.ConnectOption) (sessionPresent bool, err error)
 	DisconnectFn  func(ctx context.Context) error
 	PublishFn     func(ctx context.Context, message *mqtt.Message) error
-	SubscribeFn   func(ctx context.Context, subs ...mqtt.Subscription) error
+	SubscribeFn   func(ctx context.Context, subs ...mqtt.Subscription) ([]mqtt.Subscription, error)
 	UnsubscribeFn func(ctx context.Context, subs ...string) error
 	PingFn        func(ctx context.Context) error
 	handler       mqtt.Handler
@@ -58,9 +58,9 @@ func (c *Client) Publish(ctx context.Context, message *mqtt.Message) error {
 }
 
 // Subscribe implements mqtt.Client.
-func (c *Client) Subscribe(ctx context.Context, subs ...mqtt.Subscription) error {
+func (c *Client) Subscribe(ctx context.Context, subs ...mqtt.Subscription) ([]mqtt.Subscription, error) {
 	if c.SubscribeFn == nil {
-		return nil
+		return nil, nil
 	}
 	return c.SubscribeFn(ctx, subs...)
 }
