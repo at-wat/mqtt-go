@@ -52,9 +52,12 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	cli := c.cli
 	c.mu.Unlock()
 
-	if err := cli.ValidateMessage(message); err != nil {
-		return wrapError(err, "validating publishing message")
+	if cli != nil {
+		if err := cli.ValidateMessage(message); err != nil {
+			return wrapError(err, "validating publishing message")
+		}
 	}
+
 	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		c.publish(ctx, cli, message)
 	}), "retryclient: publishing")
@@ -78,6 +81,9 @@ func (c *RetryClient) Unsubscribe(ctx context.Context, topics ...string) error {
 }
 
 func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Message) {
+	if err := cli.ValidateMessage(message); err != nil {
+		return
+	}
 	publish := func(ctx context.Context, cli *BaseClient, message *Message) {
 		if err := cli.Publish(ctx, message); err != nil {
 			select {

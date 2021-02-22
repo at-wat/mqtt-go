@@ -34,3 +34,27 @@ func TestRetryClientPublish_MessageValidationError(t *testing.T) {
 		)
 	}
 }
+
+func TestRetryClient_NilClient(t *testing.T) {
+	cli := &RetryClient{}
+	t.Run("Publish", func(t *testing.T) {
+		if err := cli.Publish(context.Background(), &Message{
+			Payload: make([]byte, 101),
+		}); err != nil {
+			t.Errorf("Unexpected error: '%v'", err)
+		}
+	})
+	t.Run("Subscribe", func(t *testing.T) {
+		if _, err := cli.Subscribe(context.Background(), Subscription{
+			Topic: "test",
+			QoS:   QoS1,
+		}); err != nil {
+			t.Errorf("Unexpected error: '%v'", err)
+		}
+	})
+	t.Run("Unsubscribe", func(t *testing.T) {
+		if err := cli.Unsubscribe(context.Background(), "test"); err != nil {
+			t.Errorf("Unexpected error: '%v'", err)
+		}
+	})
+}
