@@ -34,9 +34,7 @@ jobs:
           (! grep require paho/go.mod)
           (! grep replace paho/go.mod)  # don't add require/replace to paho/go.mod
       - name: Prepare integration test
-        run: |
-          docker-compose up -d
-          echo 'replace github.com/at-wat/mqtt-go => ../' >> paho/go.mod
+        run: docker-compose up -d
       - name: Run go test
         run: |
           eval ${{ matrix.env }}
@@ -49,12 +47,18 @@ jobs:
             -tags integration \
             -race -coverprofile=cover.out -covermode=atomic
 
-          (cd paho; go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION})
-          (cd paho; go vet ./...)
-          (cd paho; go test ./... \
-            -v \
-            -tags integration \
-            -race -coverprofile=cover.out -covermode=atomic)
+          (
+            cd paho
+            go get github.com/at-wat/mqtt-go
+            echo 'replace github.com/at-wat/mqtt-go => ../' >> paho/go.mod
+            go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION}
+            go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION}
+            go vet ./...
+            go test ./... \
+              -v \
+              -tags integration \
+              -race -coverprofile=cover.out -covermode=atomic
+          )
 
           go mod tidy
           git diff --exit-code go.mod go.sum  # mod/sum must be up-to-date and tidied
