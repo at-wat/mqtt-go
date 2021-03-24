@@ -178,8 +178,9 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 	return c, nil
 }
 
-// BaseClientStoreDialer is a dialer wrapper which stores latest BaseClient.
+// BaseClientStoreDialer is a dialer wrapper which stores the latest BaseClient.
 type BaseClientStoreDialer struct {
+	// Dialer is a wrapped dialer. Valid Dialer must be set before use.
 	Dialer
 
 	mu         sync.RWMutex

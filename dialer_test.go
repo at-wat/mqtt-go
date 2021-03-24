@@ -15,6 +15,7 @@
 package mqtt
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strings"
@@ -52,5 +53,35 @@ func TestDial_UnsupportedProtocol(t *testing.T) {
 func TestDial_InvalidURL(t *testing.T) {
 	if _, err := Dial("://localhost"); !strings.Contains(err.Error(), "missing protocol scheme") {
 		t.Errorf("Expected error: 'missing protocol scheme', got: '%v'", err)
+	}
+}
+
+func ExampleBaseClientStoreDialer() {
+	dialer := &BaseClientStoreDialer{Dialer: &URLDialer{URL: "mqtt://localhost:1883"}}
+	cli, err := NewReconnectClient(dialer)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if _, err := cli.Connect(ctx, "TestClient"); err != nil {
+		panic(err)
+	}
+	defer cli.Disconnect(context.Background())
+
+	// Publish asynchronously
+	if err := cli.Publish(
+		ctx, &Message{Topic: "test", QoS: QoS1, Payload: []byte("async")},
+	); err != nil {
+		panic(err)
+	}
+
+	// Publish synchronously
+	if err := dialer.BaseClient().Publish(
+		ctx, &Message{Topic: "test", QoS: QoS1, Payload: []byte("sync")},
+	); err != nil {
+		panic(err)
 	}
 }
