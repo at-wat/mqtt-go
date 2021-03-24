@@ -50,7 +50,7 @@ jobs:
           (
             cd paho
             go get github.com/at-wat/mqtt-go
-            echo 'replace github.com/at-wat/mqtt-go => ../' >> paho/go.mod
+            echo 'replace github.com/at-wat/mqtt-go => ../' >> go.mod
             go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION}
             go get github.com/eclipse/paho.mqtt.golang@${PAHO_VERSION}
             go vet ./...
