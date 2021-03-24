@@ -108,7 +108,7 @@ func TestServeParseError(t *testing.T) {
 
 			go func() {
 				if _, err := ca.Write(c.input); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
+					t.Errorf("Unexpected error: '%v'", err)
 				}
 			}()
 			if err := cli.serve(); !errors.Is(err, c.err) {
