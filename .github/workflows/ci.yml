@@ -16,6 +16,7 @@ jobs:
         go:
           - '1.14'
           - '1.15'
+          - '1.16'
         env:
           - PAHO_VERSION=v1.2.0
           - PAHO_VERSION=v1.3.2
