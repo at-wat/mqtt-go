@@ -146,14 +146,6 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 					for pktName, head := range cases {
 						fIn, fOut := head.in, head.out
 						t.Run("StopAt"+pktName, func(t *testing.T) {
-							if pktName == "PublishOut" && name == "WebSockets" {
-								// Mosquitto doesn't publish the first retained message on
-								// reconnecting wss if the previous connection was aborted
-								// before PUBLISH packet.
-								// Other protocols work as expected.
-								t.SkipNow()
-							}
-
 							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 							defer cancel()
 							var dialCnt int32
@@ -399,12 +391,6 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
-			if name == "MQTT" || name == "MQTTs" {
-				// I don't know why but it often fails on MQTT(s) on Mosquitto.
-				// Other protocols work as expected.
-				t.SkipNow()
-			}
-
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 
@@ -684,11 +670,6 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 			for name, url := range urls {
 				url := url
 				t.Run(name, func(t *testing.T) {
-					if name == "WebSocket" || name == "WebSockets" {
-						// WebSocket requires longer time to connect.
-						t.SkipNow()
-					}
-
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 
