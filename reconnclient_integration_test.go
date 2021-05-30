@@ -142,6 +142,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 						"PublishOut": {0x30, QoS1, 0x00},
 						"PubAck":     {0x00, QoS1, 0x40},
 						"PubRec":     {0x00, QoS2, 0x50},
+						"PubRel":     {0x60, QoS2, 0x00},
 						"PubComp":    {0x00, QoS2, 0x70},
 						"SubAck":     {0x00, QoS1, 0x90},
 						"PublishIn":  {0x00, QoS1, 0x30},
