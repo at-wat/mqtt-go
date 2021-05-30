@@ -54,35 +54,46 @@ func TestError(t *testing.T) {
 
 	t.Run("Is", func(t *testing.T) {
 		if !errChained.(*Error).Is(errChained) {
-			t.Errorf("Wrapped error '%v' doesn't match its-self", errChained)
+			t.Errorf("Wrapped error '%v' doesn't match with its-self", errChained)
 		}
 		if !errChained.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' doesn't match '%v'", errChained, errBase)
+			t.Errorf("Wrapped error '%v' doesn't match with '%v'", errChained, errBase)
 		}
 		if !errChained2.(*Error).Is(errChained2) {
-			t.Errorf("Wrapped error '%v' doesn't match its-self", errChained2)
+			t.Errorf("Wrapped error '%v' doesn't match with its-self", errChained2)
 		}
 		if !errChained2.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' doesn't match '%v'", errChained2, errBase)
+			t.Errorf("Wrapped error '%v' doesn't match with '%v'", errChained2, errBase)
 		}
 		if !errDoubleChained.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' doesn't match '%v'", errDoubleChained, errBase)
+			t.Errorf("Wrapped error '%v' doesn't match with '%v'", errDoubleChained, errBase)
 		}
 		if !err112Chained.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' doesn't match '%v'",
+			t.Errorf("Wrapped error '%v' doesn't match with '%v'",
 				err112Chained, errBase)
 		}
+		if !(&Error{}).Is(nil) {
+			t.Errorf("Wrapped nil error doesn't match with 'nil'")
+		}
 		if errChainedNil != nil {
-			t.Errorf("Nil chained error '%v' doesn't match 'nil'", errChainedNil)
+			t.Errorf("Nil chained error '%v' doesn't match with 'nil'", errChainedNil)
 		}
 
 		if errChainedOther.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
+			t.Errorf("Wrapped error '%v' unexpectedly matched with '%v'",
 				errChainedOther, errBase)
 		}
 		if err112Nil.(*Error).Is(errBase) {
-			t.Errorf("Wrapped error '%v' unexpectedly matched '%v'",
+			t.Errorf("Wrapped error '%v' unexpectedly matched with '%v'",
 				errChainedOther, errBase)
+		}
+		if errChained.(*Error).Is(nil) {
+			t.Errorf("Wrapped error '%v' unexpectedly matched with 'nil'",
+				errChained)
+		}
+		if (&Error{}).Is(errBase) {
+			t.Errorf("Wrapped nil error unexpectedly matched with '%v'",
+				errBase)
 		}
 	})
 
