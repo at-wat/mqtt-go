@@ -138,3 +138,35 @@ func TestReadPacketError(t *testing.T) {
 		}
 	}
 }
+
+func TestServe_UncorrespondingResponse(t *testing.T) {
+	cases := map[string][]byte{
+		"ConnAck":  []byte{0x20, 0x02, 0x00, 0x00},
+		"PubAck":   []byte{0x40, 0x02, 0xFF, 0xFF},
+		"PubRec":   []byte{0x50, 0x02, 0xFF, 0xFF},
+		"PubRel":   []byte{0x62, 0x02, 0xFF, 0xFF},
+		"PubComp":  []byte{0x70, 0x02, 0xFF, 0xFF},
+		"SubAck":   []byte{0x90, 0x02, 0xFF, 0xFF},
+		"UnsubAck": []byte{0xB0, 0x02, 0xFF, 0xFF},
+		"PingResp": []byte{0xD0, 0x00},
+	}
+
+	for name, c := range cases {
+		c := c
+		t.Run(name, func(t *testing.T) {
+			ca, cb := net.Pipe()
+			cli := &BaseClient{Transport: cb}
+			cli.init()
+
+			go func() {
+				if _, err := ca.Write(c); err != nil {
+					t.Errorf("Unexpected error: '%v'", err)
+				}
+				ca.Close()
+			}()
+			if err := cli.serve(); err != io.EOF {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+		})
+	}
+}

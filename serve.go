@@ -131,11 +131,11 @@ func (c *BaseClient) serve() error {
 					handler.Serve(msg)
 				}
 				delete(subBuffer, pubRel.ID)
-			}
 
-			pktPubComp := (&pktPubComp{ID: pubRel.ID}).Pack()
-			if err := c.write(pktPubComp); err != nil {
-				return wrapError(err, "sending PUBCOMP")
+				pktPubComp := (&pktPubComp{ID: pubRel.ID}).Pack()
+				if err := c.write(pktPubComp); err != nil {
+					return wrapError(err, "sending PUBCOMP")
+				}
 			}
 		case packetPubComp:
 			pubComp, err := (&pktPubComp{}).Parse(pktFlag, contents)
