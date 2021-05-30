@@ -139,11 +139,3 @@ func wrapErrorWithRetry(err error, retry retryFn, failure string) error {
 	}
 	return err2
 }
-
-func wrapErrorfWithRetry(err error, retry retryFn, failureFmt string, v ...interface{}) error {
-	err2 := wrapErrorImpl(err, fmt.Sprintf(failureFmt, v...))
-	if err, ok := err2.(*Error); ok {
-		return &errorWithRetry{errorInterface: err, retryFn: retry}
-	}
-	return err2
-}

@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"errors"
+	"io"
 	"regexp"
 	"testing"
 )
@@ -42,6 +43,12 @@ func TestError(t *testing.T) {
 	err112Chained := wrapErrorf(&dummyError{errBase}, "info")
 	err112Nil := wrapErrorf(&dummyError{nil}, "info")
 	errStrRegex := regexp.MustCompile(`^info \[error_test\.go:[0-9]+\]: an error$`)
+
+	t.Run("wrapError", func(t *testing.T) {
+		if err := wrapError(io.EOF, "info"); err != io.EOF {
+			t.Errorf("io.EOF must not be wrapped, got '%v'", err)
+		}
+	})
 
 	t.Run("ErrorsIs", func(t *testing.T) {
 		if !errors.Is(errChained, errBase) {
