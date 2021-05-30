@@ -134,17 +134,21 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 				t.Run(dropName, func(t *testing.T) {
 					cases := map[string]struct {
 						out byte
+						qos QoS
 						in  byte
 					}{
-						"ConnAck":    {0x00, 0x20},
-						"Subscribe":  {0x80, 0x00},
-						"PublishOut": {0x30, 0x00},
-						"PubAck":     {0x00, 0x40},
-						"SubAck":     {0x00, 0x90},
-						"PublishIn":  {0x00, 0x30},
+						"ConnAck":    {0x00, QoS1, 0x20},
+						"Subscribe":  {0x80, QoS1, 0x00},
+						"PublishOut": {0x30, QoS1, 0x00},
+						"PubAck":     {0x00, QoS1, 0x40},
+						"PubRec":     {0x00, QoS2, 0x50},
+						"PubRel":     {0x60, QoS2, 0x00},
+						"PubComp":    {0x00, QoS2, 0x70},
+						"SubAck":     {0x00, QoS1, 0x90},
+						"PublishIn":  {0x00, QoS1, 0x30},
 					}
 					for pktName, head := range cases {
-						fIn, fOut := head.in, head.out
+						fIn, qos, fOut := head.in, head.qos, head.out
 						t.Run("StopAt"+pktName, func(t *testing.T) {
 							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 							defer cancel()
@@ -188,7 +192,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 
 							if err := cli.Publish(ctx, &Message{
 								Topic:   "test/" + name + pktName,
-								QoS:     QoS1,
+								QoS:     qos,
 								Retain:  true,
 								Payload: []byte("message"),
 							}); err != nil {
@@ -196,7 +200,7 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 							}
 							if _, err := cli.Subscribe(ctx, Subscription{
 								Topic: "test/" + name + pktName,
-								QoS:   QoS1,
+								QoS:   qos,
 							}); err != nil {
 								t.Fatalf("Unexpected error: '%v'", err)
 							}
