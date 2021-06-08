@@ -211,39 +211,48 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	go func() {
 		connected := false
 		ctx := context.Background()
-		for {
-			c.mu.Lock()
-			select {
-			case <-c.chConnSwitch:
-				connected = false
-			default:
-			}
-			if !connected || len(c.taskQueue) == 0 {
-				cli := c.cli
-				chConnectErr := c.chConnectErr
-				c.mu.Unlock()
 
-				if !connected {
-					// Wait Connect if Client was replaced by SetClient.
-					select {
-					case _, ok := <-chConnectErr:
-						if !ok {
-							connected = true
-							continue
-						}
-					case <-cli.Done():
+	L_TASK:
+		for {
+			if !connected {
+				// Wait Connect if Client was replaced by SetClient.
+				for {
+					c.mu.Lock()
+					chConnectErr := c.chConnectErr
+					c.mu.Unlock()
+					if _, ok := <-chConnectErr; !ok {
+						connected = true
+						continue L_TASK
 					}
 				}
+			}
 
-				_, ok := <-c.chTask
-				if !ok {
-					return
+			c.mu.Lock()
+			chConnSwitch := c.chConnSwitch
+			select {
+			case <-chConnSwitch:
+				c.mu.Unlock()
+				connected = false
+				continue
+			default:
+			}
+
+			if len(c.taskQueue) == 0 {
+				c.mu.Unlock()
+
+				select {
+				case _, ok := <-c.chTask:
+					if !ok {
+						return
+					}
+				case <-chConnSwitch:
+					connected = false
 				}
 				continue
 			}
+			cli := c.cli
 			task := c.taskQueue[0]
 			c.taskQueue = c.taskQueue[1:]
-			cli := c.cli
 			c.mu.Unlock()
 
 			task(ctx, cli)
