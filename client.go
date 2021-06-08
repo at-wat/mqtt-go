@@ -15,9 +15,13 @@
 package mqtt
 
 import (
+	"errors"
 	"io"
 	"sync"
 )
+
+// ErrNotConnected is returned if a function is called before Connect.
+var ErrNotConnected = errors.New("not connected")
 
 // BaseClient is a low layer MQTT client.
 // Zero values with valid underlying Transport is a valid BaseClient.
@@ -62,6 +66,16 @@ func (c *BaseClient) write(b []byte) error {
 		i += n
 	}
 	return nil
+}
+
+func (c *BaseClient) signaller() (*signaller, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.sig == nil {
+		return nil, ErrNotConnected
+	}
+	return c.sig, nil
 }
 
 type signaller struct {

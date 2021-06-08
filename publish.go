@@ -138,25 +138,30 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool)
 	}
 	message.Dup = dup
 
+	sig, err := c.signaller()
+	if err != nil {
+		return err
+	}
+
 	var chPubAck chan *pktPubAck
 	var chPubRec chan *pktPubRec
 	switch message.QoS {
 	case QoS1:
 		chPubAck = make(chan *pktPubAck, 1)
-		c.sig.mu.Lock()
-		if c.sig.chPubAck == nil {
-			c.sig.chPubAck = make(map[uint16]chan *pktPubAck, 1)
+		sig.mu.Lock()
+		if sig.chPubAck == nil {
+			sig.chPubAck = make(map[uint16]chan *pktPubAck, 1)
 		}
-		c.sig.chPubAck[message.ID] = chPubAck
-		c.sig.mu.Unlock()
+		sig.chPubAck[message.ID] = chPubAck
+		sig.mu.Unlock()
 	case QoS2:
 		chPubRec = make(chan *pktPubRec, 1)
-		c.sig.mu.Lock()
-		if c.sig.chPubRec == nil {
-			c.sig.chPubRec = make(map[uint16]chan *pktPubRec, 1)
+		sig.mu.Lock()
+		if sig.chPubRec == nil {
+			sig.chPubRec = make(map[uint16]chan *pktPubRec, 1)
 		}
-		c.sig.chPubRec[message.ID] = chPubRec
-		c.sig.mu.Unlock()
+		sig.chPubRec[message.ID] = chPubRec
+		sig.mu.Unlock()
 	}
 
 	retryPublish := func(ctx context.Context, cli *BaseClient) error {
@@ -190,13 +195,17 @@ func publishImpl(ctx context.Context, c *BaseClient, message *Message, dup bool)
 
 		var retryPublish2 func(context.Context, *BaseClient) error
 		retryPublish2 = func(ctx context.Context, cli *BaseClient) error {
-			chPubComp := make(chan *pktPubComp, 1)
-			cli.sig.mu.Lock()
-			if cli.sig.chPubComp == nil {
-				cli.sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
+			sig, err := cli.signaller()
+			if err != nil {
+				return err
 			}
-			cli.sig.chPubComp[message.ID] = chPubComp
-			cli.sig.mu.Unlock()
+			chPubComp := make(chan *pktPubComp, 1)
+			sig.mu.Lock()
+			if sig.chPubComp == nil {
+				sig.chPubComp = make(map[uint16]chan *pktPubComp, 1)
+			}
+			sig.chPubComp[message.ID] = chPubComp
+			sig.mu.Unlock()
 
 			pktPubRel := (&pktPubRel{ID: message.ID}).Pack()
 			if err := cli.write(pktPubRel); err != nil {

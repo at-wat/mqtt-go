@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-func TestProtocolViolation(t *testing.T) {
+func TestBaseClient_ProtocolViolation(t *testing.T) {
 	ca, cb := net.Pipe()
 	cli := &BaseClient{Transport: cb}
 
@@ -89,4 +89,46 @@ func TestProtocolViolation(t *testing.T) {
 	if cli.connState.String() != "Closed" {
 		t.Errorf("Final state must be 'Closed' after protocol violation, but is '%s'", cli.connState)
 	}
+}
+
+func TestBaseClient_UseBeforeConnect(t *testing.T) {
+	_, cb := net.Pipe()
+	cli := &BaseClient{Transport: cb}
+	defer cb.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	t.Run("Subscribe", func(t *testing.T) {
+		_, err := cli.Subscribe(ctx, Subscription{Topic: "test"})
+		if err != ErrNotConnected {
+			t.Errorf("Unconnected cli.Subscribe must return '%v', got '%v'",
+				ErrNotConnected, err,
+			)
+		}
+	})
+	t.Run("Unsubscribe", func(t *testing.T) {
+		err := cli.Unsubscribe(ctx, "test")
+		if err != ErrNotConnected {
+			t.Errorf("Unconnected cli.Unsubscribe must return '%v', got '%v'",
+				ErrNotConnected, err,
+			)
+		}
+	})
+	t.Run("Publish", func(t *testing.T) {
+		err := cli.Publish(ctx, &Message{Topic: "test"})
+		if err != ErrNotConnected {
+			t.Errorf("Unconnected cli.Unsubscribe must return '%v', got '%v'",
+				ErrNotConnected, err,
+			)
+		}
+	})
+	t.Run("PingReq", func(t *testing.T) {
+		err := cli.Ping(ctx)
+		if err != ErrNotConnected {
+			t.Errorf("Unconnected cli.Unsubscribe must return '%v', got '%v'",
+				ErrNotConnected, err,
+			)
+		}
+	})
 }

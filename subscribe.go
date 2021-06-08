@@ -71,13 +71,17 @@ func subscribeImpl(ctx context.Context, c *BaseClient, subs ...Subscription) ([]
 
 	id := c.newID()
 
-	chSubAck := make(chan *pktSubAck, 1)
-	c.sig.mu.Lock()
-	if c.sig.chSubAck == nil {
-		c.sig.chSubAck = make(map[uint16]chan *pktSubAck, 1)
+	sig, err := c.signaller()
+	if err != nil {
+		return nil, err
 	}
-	c.sig.chSubAck[id] = chSubAck
-	c.sig.mu.Unlock()
+	chSubAck := make(chan *pktSubAck, 1)
+	sig.mu.Lock()
+	if sig.chSubAck == nil {
+		sig.chSubAck = make(map[uint16]chan *pktSubAck, 1)
+	}
+	sig.chSubAck[id] = chSubAck
+	sig.mu.Unlock()
 
 	retrySubscribe := func(ctx context.Context, cli *BaseClient) error {
 		_, err := subscribeImpl(ctx, cli, subs...)
