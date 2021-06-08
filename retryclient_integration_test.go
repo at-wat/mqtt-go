@@ -134,44 +134,43 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 	for _, pubAt := range pubTimings {
 		pubAt := pubAt
 		t.Run(string(pubAt), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			ctxDone, done := context.WithCancel(context.Background())
+			defer done()
+
+			var cnt int
+			const expectedCount = 100
+
+			cliRecv, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			if _, err := cliRecv.Connect(ctx, "RetryClientQueueRecv"); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if _, err := cliRecv.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+				t.Fatal(err)
+			}
+			cliRecv.Handle(HandlerFunc(func(*Message) {
+				cnt++
+				if cnt == expectedCount {
+					done()
+				}
+			}))
+
 			cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-
-			ctxDone, done := context.WithCancel(context.Background())
-			defer done()
-
 			var cli RetryClient
-			var cnt int
-
-			cli.Handle(HandlerFunc(func(msg *Message) {
-				if err := cli.Publish(ctx, &Message{
-					Topic:   "test/queue_response",
-					QoS:     QoS1,
-					Payload: []byte("message"),
-				}); err != nil {
-					t.Errorf("Unexpected error: '%v'", err)
-					return
-				}
-				cnt++
-				if cnt == 100 {
-					done()
-				}
-			}))
-
-			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
-				t.Fatal(err)
-			}
-
 			publish := func() {
-				for i := 0; i < 100; i++ {
+				for i := 0; i < expectedCount; i++ {
 					if err := cli.Publish(ctx, &Message{
 						Topic:   "test/queue",
-						QoS:     QoS0,
+						QoS:     QoS1,
 						Payload: []byte("message"),
 					}); err != nil {
 						t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
