@@ -188,8 +188,9 @@ func (c *RetryClient) Client() *BaseClient {
 	return c.cli
 }
 
-// SetClient sets the new Client.
+// SetClient sets the new BaseClient.
 // Call Retry() and Resubscribe() to process queued messages and subscriptions.
+// The BaseClient must be unconnected when it is passed to the RetryClient.
 func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	c.mu.Lock()
 	c.cli = cli
