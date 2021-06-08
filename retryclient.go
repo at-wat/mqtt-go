@@ -220,10 +220,10 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			if !connected {
 				// Wait Connect if Client was replaced by SetClient.
 				for {
-					c.mu.Lock()
+					c.mu.RLock()
 					chConnectErr := c.chConnectErr
 					chConnSwitch := c.chConnSwitch
-					c.mu.Unlock()
+					c.mu.RUnlock()
 					select {
 					case _, ok := <-chConnectErr:
 						if !ok {
