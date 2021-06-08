@@ -15,9 +15,13 @@
 package mqtt
 
 import (
+	"errors"
 	"io"
 	"sync"
 )
+
+// ErrNotConnected is returned if a function is called before Connect.
+var ErrNotConnected = errors.New("not connected")
 
 // BaseClient is a low layer MQTT client.
 // Zero values with valid underlying Transport is a valid BaseClient.
