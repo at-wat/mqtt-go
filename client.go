@@ -68,6 +68,16 @@ func (c *BaseClient) write(b []byte) error {
 	return nil
 }
 
+func (c *BaseClient) signaller() (*signaller, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.sig == nil {
+		return nil, ErrNotConnected
+	}
+	return c.sig, nil
+}
+
 type signaller struct {
 	chConnAck  chan *pktConnAck
 	chPingResp chan *pktPingResp

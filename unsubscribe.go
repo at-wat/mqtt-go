@@ -47,13 +47,17 @@ func unsubscribeImpl(ctx context.Context, c *BaseClient, subs ...string) error {
 
 	id := c.newID()
 
-	chUnsubAck := make(chan *pktUnsubAck, 1)
-	c.sig.mu.Lock()
-	if c.sig.chUnsubAck == nil {
-		c.sig.chUnsubAck = make(map[uint16]chan *pktUnsubAck, 1)
+	sig, err := c.signaller()
+	if err != nil {
+		return err
 	}
-	c.sig.chUnsubAck[id] = chUnsubAck
-	c.sig.mu.Unlock()
+	chUnsubAck := make(chan *pktUnsubAck, 1)
+	sig.mu.Lock()
+	if sig.chUnsubAck == nil {
+		sig.chUnsubAck = make(map[uint16]chan *pktUnsubAck, 1)
+	}
+	sig.chUnsubAck[id] = chUnsubAck
+	sig.mu.Unlock()
 
 	retryUnsubscribe := func(ctx context.Context, cli *BaseClient) error {
 		return unsubscribeImpl(ctx, cli, subs...)

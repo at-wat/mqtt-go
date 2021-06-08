@@ -23,10 +23,14 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 	c.muConnecting.RLock()
 	defer c.muConnecting.RUnlock()
 
+	sig, err := c.signaller()
+	if err != nil {
+		return err
+	}
 	chPingResp := make(chan *pktPingResp, 1)
-	c.sig.mu.Lock()
-	c.sig.chPingResp = chPingResp
-	c.sig.mu.Unlock()
+	sig.mu.Lock()
+	sig.chPingResp = chPingResp
+	sig.mu.Unlock()
 
 	pkt := pack(packetPingReq.b())
 	if err := c.write(pkt); err != nil {
