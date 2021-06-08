@@ -163,6 +163,10 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 				}
 			}))
 
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+				t.Fatal(err)
+			}
+
 			publish := func() {
 				for i := 0; i < 100; i++ {
 					if err := cli.Publish(ctx, &Message{
@@ -196,11 +200,6 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-
-			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
-				t.Fatal(err)
-			}
-			time.Sleep(10 * time.Millisecond)
 
 			if pubAt == pubAfterConnect {
 				publish()
