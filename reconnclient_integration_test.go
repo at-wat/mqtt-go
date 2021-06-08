@@ -524,6 +524,65 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 	}
 }
 
+func TestIntegration_ReconnectClient_RetryInitialRequest(t *testing.T) {
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			topic := "test/RetryInitialReq" + name
+			var sw int32
+
+			cli, err := NewReconnectClient(
+				DialerFunc(func() (*BaseClient, error) {
+					cli, err := Dial(url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						return nil, err
+					}
+					ca, cb := filteredpipe.DetectAndClosePipe(
+						newOnOffFilter(&sw),
+						newOnOffFilter(&sw),
+					)
+					filteredpipe.Connect(ca, cli.Transport)
+					cli.Transport = cb
+					return cli, nil
+				}),
+				WithReconnectWait(50*time.Millisecond, 200*time.Millisecond),
+				WithPingInterval(250*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: topic, QoS: QoS1}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			// Disconnect
+			atomic.StoreInt32(&sw, 1)
+			go func() {
+				time.Sleep(300 * time.Millisecond)
+				// Connect
+				atomic.StoreInt32(&sw, 0)
+			}()
+
+			if _, err := cli.Connect(ctx, "RetryInitialReq"+name); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			cli.Disconnect(ctx)
+		})
+	}
+}
+
 func TestIntegration_ReconnectClient_Ping(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
