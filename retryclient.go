@@ -229,6 +229,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 					case _, ok := <-chConnectErr:
 						if !ok {
 							connected = true
+							continue
 						}
 					case <-cli.Done():
 					}
