@@ -19,8 +19,11 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/at-wat/mqtt-go/internal/filteredpipe"
 )
 
 func TestIntegration_RetryClient(t *testing.T) {
@@ -118,69 +121,175 @@ func TestIntegration_RetryClient_Cancel(t *testing.T) {
 }
 
 func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
-	cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-	if err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
+	type pubTiming string
+	const (
+		pubBeforeSetClient pubTiming = "BeforeSetClient"
+		pubBeforeConnect   pubTiming = "BeforeConnect"
+		pubAfterConnect    pubTiming = "AfterConnect"
+	)
+	pubTimings := []pubTiming{
+		pubBeforeSetClient, pubBeforeConnect, pubAfterConnect,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	var cli RetryClient
-	cli.SetClient(ctx, cliBase)
-
-	if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
-	}
-
-	ctxDone, done := context.WithCancel(context.Background())
-	defer done()
-
-	var cnt int
-	cli.Handle(HandlerFunc(func(msg *Message) {
-		if err := cli.Publish(ctx, &Message{
-			Topic:   "test/queue_response",
-			QoS:     QoS1,
-			Payload: []byte("message"),
-		}); err != nil {
-			t.Errorf("Unexpected error: '%v'", err)
-			return
+	for _, withWait := range []bool{true, false} {
+		name := "WithoutWait"
+		if withWait {
+			name = "WithWait"
 		}
-		cnt++
-		if cnt == 100 {
-			done()
-		}
-	}))
-	if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(10 * time.Millisecond)
+		withWait := withWait
+		t.Run(name, func(t *testing.T) {
+			for _, pubAt := range pubTimings {
+				pubAt := pubAt
+				t.Run(string(pubAt), func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel()
+					ctxDone, done := context.WithCancel(context.Background())
+					defer done()
 
-	func() {
-		for i := 0; i < 100; i++ {
-			if err := cli.Publish(ctx, &Message{
-				Topic:   "test/queue",
-				QoS:     QoS1,
-				Payload: []byte("message"),
-			}); err != nil {
-				t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
-				return
+					var cnt int
+					const expectedCount = 100
+
+					cliRecv, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if _, err := cliRecv.Connect(ctx, "RetryClientQueueRecv"); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					if _, err := cliRecv.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+						t.Fatal(err)
+					}
+					cliRecv.Handle(HandlerFunc(func(*Message) {
+						cnt++
+						if cnt == expectedCount {
+							done()
+						}
+					}))
+
+					cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					var cli RetryClient
+					publish := func() {
+						for i := 0; i < expectedCount; i++ {
+							if err := cli.Publish(ctx, &Message{
+								Topic:   "test/queue",
+								QoS:     QoS1,
+								Payload: []byte("message"),
+							}); err != nil {
+								t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
+								return
+							}
+							select {
+							case <-ctx.Done():
+								t.Errorf("Timeout (cnt=%d)", cnt)
+							default:
+							}
+						}
+					}
+
+					if pubAt == pubBeforeSetClient {
+						publish()
+					}
+					if withWait {
+						time.Sleep(50 * time.Millisecond)
+					}
+					cli.SetClient(ctx, cliBase)
+
+					if withWait {
+						time.Sleep(50 * time.Millisecond)
+					}
+					// Ensure there is no deadlock when SetClient before Connect.
+					cli.SetClient(ctx, cliBase)
+
+					if pubAt == pubBeforeConnect {
+						publish()
+					}
+					if withWait {
+						time.Sleep(50 * time.Millisecond)
+					}
+
+					if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					if pubAt == pubAfterConnect {
+						publish()
+					}
+
+					select {
+					case <-ctx.Done():
+						t.Errorf("Timeout (cnt=%d)", cnt)
+					case <-ctxDone.Done():
+					}
+
+					if err := cli.Disconnect(ctx); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+				})
 			}
-			select {
-			case <-ctx.Done():
-				t.Errorf("Timeout (cnt=%d)", cnt)
-			default:
-			}
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		t.Errorf("Timeout (cnt=%d)", cnt)
-	case <-ctxDone.Done():
+		})
 	}
+}
 
-	if err := cli.Disconnect(ctx); err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
+func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			topic := "test/RetryInitialReq" + name
+			var sw int32
+
+			cli, err := NewReconnectClient(
+				DialerFunc(func() (*BaseClient, error) {
+					cli, err := Dial(url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					)
+					if err != nil {
+						return nil, err
+					}
+					ca, cb := filteredpipe.DetectAndClosePipe(
+						newOnOffFilter(&sw),
+						newOnOffFilter(&sw),
+					)
+					filteredpipe.Connect(ca, cli.Transport)
+					cli.Transport = cb
+					return cli, nil
+				}),
+				WithReconnectWait(50*time.Millisecond, 200*time.Millisecond),
+				WithPingInterval(250*time.Millisecond),
+				WithTimeout(250*time.Millisecond),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: topic, QoS: QoS1}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			// Disconnect
+			atomic.StoreInt32(&sw, 1)
+			go func() {
+				time.Sleep(300 * time.Millisecond)
+				// Connect
+				atomic.StoreInt32(&sw, 0)
+			}()
+
+			if _, err := cli.Connect(ctx, "RetryInitialReq"+name); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			cli.Disconnect(ctx)
+		})
 	}
 }
