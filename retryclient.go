@@ -25,12 +25,13 @@ var ErrClosedClient = errors.New("operation on closed client")
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	cli       *BaseClient
-	connected chan struct{}
+	cli          *BaseClient
+	chConnectErr chan error
+	chConnSwitch chan struct{}
 
 	retryQueue     []retryFn
 	subEstablished subscriptions // acknoledged subscriptions
-	mu             sync.Mutex
+	mu             sync.RWMutex
 	handler        Handler
 	chTask         chan struct{}
 	taskQueue      []func(ctx context.Context, cli *BaseClient)
@@ -49,9 +50,9 @@ func (c *RetryClient) Handle(handler Handler) {
 // Publish tries to publish the message and immediately returns.
 // If it is not acknowledged to be published, the message will be queued.
 func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
-	c.mu.Lock()
+	c.mu.RLock()
 	cli := c.cli
-	c.mu.Unlock()
+	c.mu.RUnlock()
 
 	if cli != nil {
 		if err := cli.ValidateMessage(message); err != nil {
@@ -176,16 +177,16 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 
 // Ping to the broker.
 func (c *RetryClient) Ping(ctx context.Context) error {
-	c.mu.Lock()
+	c.mu.RLock()
 	cli := c.cli
-	c.mu.Unlock()
+	c.mu.RUnlock()
 	return wrapError(cli.Ping(ctx), "retryclient: pinging")
 }
 
 // Client returns the base client.
 func (c *RetryClient) Client() *BaseClient {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.cli
 }
 
@@ -195,7 +196,11 @@ func (c *RetryClient) Client() *BaseClient {
 func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	c.mu.Lock()
 	c.cli = cli
-	c.connected = make(chan struct{})
+	c.chConnectErr = make(chan error, 1)
+	if c.chConnSwitch != nil {
+		close(c.chConnSwitch)
+	}
+	c.chConnSwitch = make(chan struct{})
 	c.mu.Unlock()
 
 	if c.chTask != nil {
@@ -204,20 +209,31 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 
 	c.chTask = make(chan struct{}, 1)
 	go func() {
-		init := true
+		connected := false
 		ctx := context.Background()
 		for {
 			c.mu.Lock()
-			if init || len(c.taskQueue) == 0 {
+			select {
+			case <-c.chConnSwitch:
+				connected = false
+			default:
+			}
+			if !connected || len(c.taskQueue) == 0 {
 				cli := c.cli
-				connected := c.connected
+				chConnectErr := c.chConnectErr
 				c.mu.Unlock()
 
-				select {
-				case <-connected:
-					init = false
-				case <-cli.Done():
+				if !connected {
+					// Wait Connect if Client was replaced by SetClient.
+					select {
+					case _, ok := <-chConnectErr:
+						if !ok {
+							connected = true
+						}
+					case <-cli.Done():
+					}
 				}
+
 				_, ok := <-c.chTask
 				if !ok {
 					return
@@ -259,13 +275,14 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 	c.mu.Lock()
 	cli := c.cli
 	cli.Handle(c.handler)
-	connected := c.connected
+	chConnectErr := c.chConnectErr
 	c.mu.Unlock()
 
 	present, err := cli.Connect(ctx, clientID, opts...)
-	if err == nil {
-		close(connected)
+	if err != nil {
+		chConnectErr <- err
 	}
+	close(chConnectErr)
 
 	return present, wrapError(err, "retryclient: connecting")
 }
