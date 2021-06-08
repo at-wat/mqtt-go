@@ -219,10 +219,15 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 				for {
 					c.mu.Lock()
 					chConnectErr := c.chConnectErr
+					chConnSwitch := c.chConnSwitch
 					c.mu.Unlock()
-					if _, ok := <-chConnectErr; !ok {
-						connected = true
-						continue L_TASK
+					select {
+					case _, ok := <-chConnectErr:
+						if !ok {
+							connected = true
+							continue L_TASK
+						}
+					case <-chConnSwitch:
 					}
 				}
 			}
