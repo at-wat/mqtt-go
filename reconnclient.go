@@ -83,7 +83,14 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 				clean = false // Clean only first time.
 				c.RetryClient.SetClient(ctx, baseCli)
 
-				ctxTimeout, cancel := context.WithTimeout(ctx, c.options.Timeout)
+				var ctxTimeout context.Context
+				var cancel func()
+				if c.options.Timeout == 0 {
+					ctxTimeout, cancel = ctx, func() {}
+				} else {
+					ctxTimeout, cancel = context.WithTimeout(ctx, c.options.Timeout)
+				}
+
 				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
 					cancel()
 
