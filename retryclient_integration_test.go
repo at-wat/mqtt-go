@@ -182,14 +182,14 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			}
 
 			if pubAt == pubBeforeSetClient {
-				go publish()
+				publish()
 			}
 			time.Sleep(50 * time.Millisecond)
 
 			cli.SetClient(ctx, cliBase)
 
 			if pubAt == pubBeforeConnect {
-				go publish()
+				publish()
 			}
 			time.Sleep(50 * time.Millisecond)
 
@@ -203,7 +203,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			if pubAt == pubAfterConnect {
-				go publish()
+				publish()
 			}
 
 			select {
