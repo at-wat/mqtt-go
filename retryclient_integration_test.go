@@ -121,82 +121,101 @@ func TestIntegration_RetryClient_Cancel(t *testing.T) {
 }
 
 func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
-	cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-	if err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
+	type pubTiming string
+	const (
+		pubBeforeSetClient pubTiming = "BeforeSetClient"
+		pubBeforeConnect   pubTiming = "BeforeConnect"
+		pubAfterConnect    pubTiming = "AfterConnect"
+	)
+	pubTimings := []pubTiming{
+		pubBeforeSetClient, pubBeforeConnect, pubAfterConnect,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	for _, pubAt := range pubTimings {
+		pubAt := pubAt
+		t.Run(string(pubAt), func(t *testing.T) {
+			cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 
-	var cli RetryClient
-	var cnt int
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 
-	publish := func() {
-		if err := cli.Publish(ctx, &Message{
-			Topic:   "test/queue",
-			QoS:     QoS0,
-			Payload: []byte("message"),
-		}); err != nil {
-			t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
-			return
-		}
-		select {
-		case <-ctx.Done():
-			t.Errorf("Timeout (cnt=%d)", cnt)
-		default:
-		}
-	}
+			ctxDone, done := context.WithCancel(context.Background())
+			defer done()
 
-	// Must be queued and done after Connect.
-	for i := 0; i < 10; i++ {
-		publish()
-	}
+			var cli RetryClient
+			var cnt int
 
-	cli.SetClient(ctx, cliBase)
+			cli.Handle(HandlerFunc(func(msg *Message) {
+				if err := cli.Publish(ctx, &Message{
+					Topic:   "test/queue_response",
+					QoS:     QoS1,
+					Payload: []byte("message"),
+				}); err != nil {
+					t.Errorf("Unexpected error: '%v'", err)
+					return
+				}
+				cnt++
+				if cnt == 100 {
+					done()
+				}
+			}))
 
-	time.Sleep(100 * time.Millisecond)
+			publish := func() {
+				for i := 0; i < 100; i++ {
+					if err := cli.Publish(ctx, &Message{
+						Topic:   "test/queue",
+						QoS:     QoS0,
+						Payload: []byte("message"),
+					}); err != nil {
+						t.Errorf("Unexpected error: '%v' (cnt=%d)", err, cnt)
+						return
+					}
+					select {
+					case <-ctx.Done():
+						t.Errorf("Timeout (cnt=%d)", cnt)
+					default:
+					}
+				}
+			}
 
-	if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
-	}
+			if pubAt == pubBeforeSetClient {
+				go publish()
+			}
+			time.Sleep(50 * time.Millisecond)
 
-	ctxDone, done := context.WithCancel(context.Background())
-	defer done()
+			cli.SetClient(ctx, cliBase)
 
-	cli.Handle(HandlerFunc(func(msg *Message) {
-		if err := cli.Publish(ctx, &Message{
-			Topic:   "test/queue_response",
-			QoS:     QoS1,
-			Payload: []byte("message"),
-		}); err != nil {
-			t.Errorf("Unexpected error: '%v'", err)
-			return
-		}
-		cnt++
-		if cnt == 100 {
-			done()
-		}
-	}))
-	if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(10 * time.Millisecond)
+			if pubAt == pubBeforeConnect {
+				go publish()
+			}
+			time.Sleep(50 * time.Millisecond)
 
-	func() {
-		for i := 0; i < 90; i++ {
-			publish()
-		}
-	}()
+			if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 
-	select {
-	case <-ctx.Done():
-		t.Errorf("Timeout (cnt=%d)", cnt)
-	case <-ctxDone.Done():
-	}
+			if _, err := cli.Subscribe(ctx, Subscription{Topic: "test/queue", QoS: QoS1}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(10 * time.Millisecond)
 
-	if err := cli.Disconnect(ctx); err != nil {
-		t.Fatalf("Unexpected error: '%v'", err)
+			if pubAt == pubAfterConnect {
+				go publish()
+			}
+
+			select {
+			case <-ctx.Done():
+				t.Errorf("Timeout (cnt=%d)", cnt)
+			case <-ctxDone.Done():
+			}
+
+			if err := cli.Disconnect(ctx); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+		})
 	}
 }
 

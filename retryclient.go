@@ -25,7 +25,8 @@ var ErrClosedClient = errors.New("operation on closed client")
 
 // RetryClient queues unacknowledged messages and retry on reconnect.
 type RetryClient struct {
-	cli *BaseClient
+	cli       *BaseClient
+	connected chan struct{}
 
 	retryQueue     []retryFn
 	subEstablished subscriptions // acknoledged subscriptions
@@ -194,6 +195,7 @@ func (c *RetryClient) Client() *BaseClient {
 func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	c.mu.Lock()
 	c.cli = cli
+	c.connected = make(chan struct{})
 	c.mu.Unlock()
 
 	if c.chTask != nil {
@@ -202,11 +204,20 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 
 	c.chTask = make(chan struct{}, 1)
 	go func() {
+		init := true
 		ctx := context.Background()
 		for {
 			c.mu.Lock()
-			if len(c.taskQueue) == 0 {
+			if init || len(c.taskQueue) == 0 {
+				cli := c.cli
+				connected := c.connected
 				c.mu.Unlock()
+
+				select {
+				case <-connected:
+					init = false
+				case <-cli.Done():
+				}
 				_, ok := <-c.chTask
 				if !ok {
 					return
@@ -248,9 +259,13 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 	c.mu.Lock()
 	cli := c.cli
 	cli.Handle(c.handler)
+	connected := c.connected
 	c.mu.Unlock()
 
 	present, err := cli.Connect(ctx, clientID, opts...)
+	if err == nil {
+		close(connected)
+	}
 
 	return present, wrapError(err, "retryclient: connecting")
 }
