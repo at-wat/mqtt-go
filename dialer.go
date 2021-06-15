@@ -39,36 +39,20 @@ type URLDialer struct {
 
 // Dialer is an interface to create connection.
 type Dialer interface {
-	Dial() (*BaseClient, error)
 	DialContext(context.Context) (*BaseClient, error)
 }
 
 // DialerFunc type is an adapter to use functions as MQTT connection dialer.
 type DialerFunc func(ctx context.Context) (*BaseClient, error)
 
-// Dial calls d() without context.
-func (d DialerFunc) Dial() (*BaseClient, error) {
-	return d(context.TODO())
-}
-
 // DialContext calls d().
 func (d DialerFunc) DialContext(ctx context.Context) (*BaseClient, error) {
 	return d(ctx)
 }
 
-// Dial creates connection using its values without context.
-func (d *URLDialer) Dial() (*BaseClient, error) {
-	return DialContext(context.TODO(), d.URL, d.Options...)
-}
-
 // DialContext creates connection using its values.
 func (d *URLDialer) DialContext(ctx context.Context) (*BaseClient, error) {
 	return DialContext(ctx, d.URL, d.Options...)
-}
-
-// Dial creates MQTT client using URL string without context.
-func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
-	return DialContext(context.TODO(), urlStr, opts...)
 }
 
 // DialContext creates MQTT client using URL string.
@@ -206,9 +190,9 @@ type BaseClientStoreDialer struct {
 	baseClient *BaseClient
 }
 
-// Dial creates a new BaseClient.
-func (d *BaseClientStoreDialer) Dial() (*BaseClient, error) {
-	cli, err := d.Dialer.Dial()
+// DialContext creates a new BaseClient.
+func (d *BaseClientStoreDialer) DialContext(ctx context.Context) (*BaseClient, error) {
+	cli, err := d.Dialer.DialContext(ctx)
 	d.mu.Lock()
 	d.baseClient = cli
 	d.mu.Unlock()

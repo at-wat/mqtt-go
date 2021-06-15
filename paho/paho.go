@@ -40,6 +40,8 @@ type pahoWrapper struct {
 	connectRetry         bool
 	connectRetryInterval time.Duration
 	maxReconnectInterval time.Duration
+
+	cancel func()
 }
 
 // NewClient creates paho.mqtt.golang interface wrapping at-wat/mqtt-go.
@@ -108,13 +110,15 @@ func (c *pahoWrapper) Connect() paho.Token {
 			Retain:  c.pahoConfig.WillRetained,
 		}))
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), c.pahoConfig.ConnectTimeout)
+	c.cancel = cancel
 	if c.pahoConfig.AutoReconnect {
-		return c.connectWithRetry(opts)
+		return c.connectWithRetry(ctx, opts)
 	}
-	return c.connectOnce(opts)
+	return c.connectOnce(ctx, opts)
 }
 
-func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
+func (c *pahoWrapper) connectWithRetry(ctx context.Context, opts []mqtt.ConnectOption) paho.Token {
 	token := newToken()
 	go func() {
 		pingInterval := time.Duration(c.pahoConfig.KeepAlive) * time.Second
@@ -152,7 +156,7 @@ func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
 			token.err = err
 			token.release()
 		}
-		_, err = cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
+		_, err = cli.Connect(ctx, c.pahoConfig.ClientID, opts...)
 		if err != nil {
 			token.err = err
 			token.release()
@@ -172,11 +176,12 @@ func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
 	return token
 }
 
-func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
+func (c *pahoWrapper) connectOnce(ctx context.Context, opts []mqtt.ConnectOption) paho.Token {
 	token := newToken()
 	go func() {
 		for { // Connect retry loop
-			cli, err := mqtt.Dial(
+			cli, err := mqtt.DialContext(
+				ctx,
 				c.pahoConfig.Servers[0].String(),
 				mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
 			)
@@ -211,7 +216,7 @@ func (c *pahoWrapper) connectOnce(opts []mqtt.ConnectOption) paho.Token {
 			c.cliCloser = cli
 			c.mu.Unlock()
 
-			_, token.err = c.cli.Connect(context.Background(), c.pahoConfig.ClientID, opts...)
+			_, token.err = c.cli.Connect(ctx, c.pahoConfig.ClientID, opts...)
 			if token.err == nil {
 				if c.pahoConfig.KeepAlive > 0 {
 					// Start keep alive.

@@ -76,48 +76,25 @@ func ExampleClient() {
 }
 
 func TestIntegration_Connect(t *testing.T) {
-	t.Run("DialWithContext", func(t *testing.T) {
-		for name, url := range urls {
-			t.Run(name, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-				cli, err := DialContext(ctx, url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-				if err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
+			cli, err := DialContext(ctx, url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 
-				if _, err := cli.Connect(ctx, "Client"); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
+			if _, err := cli.Connect(ctx, "Client"); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
 
-				if err := cli.Disconnect(ctx); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-			})
-		}
-	})
-	t.Run("DialWithoutContext", func(t *testing.T) {
-		for name, url := range urls {
-			t.Run(name, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-
-				cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
-				if err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-
-				if _, err := cli.Connect(ctx, "Client"); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-
-				if err := cli.Disconnect(ctx); err != nil {
-					t.Fatalf("Unexpected error: '%v'", err)
-				}
-			})
-		}
-	})
+			if err := cli.Disconnect(ctx); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+		})
+	}
 }
 
 func TestIntegration_Publish(t *testing.T) {
