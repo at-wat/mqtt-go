@@ -27,13 +27,13 @@ import (
 func TestIntegration_KeepAlive(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
-			cli, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			cli, err := DialContext(ctx, url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
 
 			if _, err := cli.Connect(ctx, "KeepAliveClient"+name,
 				WithKeepAlive(1),

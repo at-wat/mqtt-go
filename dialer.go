@@ -15,6 +15,7 @@
 package mqtt
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -39,23 +40,39 @@ type URLDialer struct {
 // Dialer is an interface to create connection.
 type Dialer interface {
 	Dial() (*BaseClient, error)
+	DialContext(context.Context) (*BaseClient, error)
 }
 
 // DialerFunc type is an adapter to use functions as MQTT connection dialer.
-type DialerFunc func() (*BaseClient, error)
+type DialerFunc func(ctx context.Context) (*BaseClient, error)
 
-// Dial calls d().
+// Dial calls d() without context.
 func (d DialerFunc) Dial() (*BaseClient, error) {
-	return d()
+	return d(context.TODO())
 }
 
-// Dial creates connection using its values.
+// DialContext calls d().
+func (d DialerFunc) DialContext(ctx context.Context) (*BaseClient, error) {
+	return d(ctx)
+}
+
+// Dial creates connection using its values without context.
 func (d *URLDialer) Dial() (*BaseClient, error) {
-	return Dial(d.URL, d.Options...)
+	return DialContext(context.TODO(), d.URL, d.Options...)
 }
 
-// Dial creates MQTT client using URL string.
+// DialContext creates connection using its values.
+func (d *URLDialer) DialContext(ctx context.Context) (*BaseClient, error) {
+	return DialContext(ctx, d.URL, d.Options...)
+}
+
+// Dial creates MQTT client using URL string without context.
 func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
+	return DialContext(context.TODO(), urlStr, opts...)
+}
+
+// DialContext creates MQTT client using URL string.
+func DialContext(ctx context.Context, urlStr string, opts ...DialOption) (*BaseClient, error) {
 	o := &DialOptions{
 		Dialer: &net.Dialer{},
 	}
@@ -64,7 +81,7 @@ func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
 			return nil, err
 		}
 	}
-	return o.dial(urlStr)
+	return o.dial(ctx, urlStr)
 }
 
 // DialOption sets option for Dial.
@@ -135,7 +152,7 @@ func WithConnStateHandler(handler func(ConnState, error)) DialOption {
 	}
 }
 
-func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
+func (d *DialOptions) dial(ctx context.Context, urlStr string) (*BaseClient, error) {
 	c := &BaseClient{
 		ConnState:     d.ConnState,
 		MaxPayloadLen: d.MaxPayloadLen,
@@ -146,34 +163,36 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 		return nil, err
 	}
 	switch u.Scheme {
+	case "tcp", "mqtt", "tls", "ssl", "mqtts", "wss", "ws":
+	default:
+		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
+	}
+
+	baseConn, err := d.Dialer.DialContext(ctx, "tcp", u.Host)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
 	case "tcp", "mqtt":
-		conn, err := d.Dialer.Dial("tcp", u.Host)
-		if err != nil {
-			return nil, err
-		}
-		c.Transport = conn
+		c.Transport = baseConn
 	case "tls", "ssl", "mqtts":
-		conn, err := tls.DialWithDialer(d.Dialer, "tcp", u.Host, d.TLSConfig)
-		if err != nil {
-			return nil, err
-		}
-		c.Transport = conn
-	case "ws", "wss":
+		c.Transport = tls.Client(baseConn, d.TLSConfig)
+	case "wss":
+		baseConn = tls.Client(baseConn, d.TLSConfig)
+		fallthrough
+	case "ws":
 		wsc, err := websocket.NewConfig(u.String(), fmt.Sprintf("https://%s", u.Host))
 		if err != nil {
 			return nil, err
 		}
 		wsc.Protocol = append(wsc.Protocol, "mqtt")
-		wsc.Dialer = d.Dialer
 		wsc.TlsConfig = d.TLSConfig
-		ws, err := websocket.DialConfig(wsc)
+		ws, err := websocket.NewClient(wsc, baseConn)
 		if err != nil {
 			return nil, err
 		}
 		ws.PayloadType = websocket.BinaryFrame
 		c.Transport = ws
-	default:
-		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
 	}
 	return c, nil
 }

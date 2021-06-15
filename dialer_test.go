@@ -31,13 +31,16 @@ func TestDialOptionError(t *testing.T) {
 		}
 	}
 
-	if _, err := Dial("mqtt://localhost:1883", optErr()); err != errExpected {
+	if _, err := DialContext(
+		context.TODO(), "mqtt://localhost:1883", optErr(),
+	); err != errExpected {
 		t.Errorf("Expected error: '%v', got: '%v'", errExpected, err)
 	}
 }
 
 func TestDialOption_WithDialer(t *testing.T) {
-	if _, err := Dial("mqtt://localhost:1884",
+	if _, err := DialContext(
+		context.TODO(), "mqtt://localhost:1884",
 		WithDialer(&net.Dialer{Timeout: time.Nanosecond}),
 	); !strings.Contains(err.Error(), "timeout") {
 		t.Errorf("Expected timeout error, got: '%v'", err)
@@ -45,13 +48,17 @@ func TestDialOption_WithDialer(t *testing.T) {
 }
 
 func TestDial_UnsupportedProtocol(t *testing.T) {
-	if _, err := Dial("unknown://localhost:1884"); !errors.Is(err, ErrUnsupportedProtocol) {
+	if _, err := DialContext(
+		context.TODO(), "unknown://localhost:1884",
+	); !errors.Is(err, ErrUnsupportedProtocol) {
 		t.Errorf("Expected error: '%v', got: '%v'", ErrUnsupportedProtocol, err)
 	}
 }
 
 func TestDial_InvalidURL(t *testing.T) {
-	if _, err := Dial("://localhost"); !strings.Contains(err.Error(), "missing protocol scheme") {
+	if _, err := DialContext(
+		context.TODO(), "://localhost",
+	); !strings.Contains(err.Error(), "missing protocol scheme") {
 		t.Errorf("Expected error: 'missing protocol scheme', got: '%v'", err)
 	}
 }

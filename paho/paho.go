@@ -120,8 +120,8 @@ func (c *pahoWrapper) connectWithRetry(opts []mqtt.ConnectOption) paho.Token {
 		pingInterval := time.Duration(c.pahoConfig.KeepAlive) * time.Second
 
 		cli, err := mqtt.NewReconnectClient(
-			mqtt.DialerFunc(func() (*mqtt.BaseClient, error) {
-				cb, err := mqtt.Dial(c.pahoConfig.Servers[0].String(),
+			mqtt.DialerFunc(func(ctx context.Context) (*mqtt.BaseClient, error) {
+				cb, err := mqtt.DialContext(ctx, c.pahoConfig.Servers[0].String(),
 					mqtt.WithTLSConfig(c.pahoConfig.TLSConfig),
 				)
 				if err != nil {

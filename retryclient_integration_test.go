@@ -29,13 +29,13 @@ import (
 func TestIntegration_RetryClient(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
-			cliBase, err := Dial(url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			cliBase, err := DialContext(ctx, url, WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
 
 			var cli RetryClient
 			cli.SetClient(ctx, cliBase)
@@ -60,16 +60,16 @@ func TestIntegration_RetryClient(t *testing.T) {
 }
 
 func TestIntegration_RetryClient_Cancel(t *testing.T) {
-	cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cliBase, err := DialContext(ctx, urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	cliRecv, err := Dial(
-		urls["MQTT"],
+	cliRecv, err := DialContext(
+		ctx, urls["MQTT"],
 		WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 	)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 					var cnt int
 					const expectedCount = 100
 
-					cliRecv, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					cliRecv, err := DialContext(ctx, urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
@@ -167,7 +167,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 						}
 					}))
 
-					cliBase, err := Dial(urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+					cliBase, err := DialContext(ctx, urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
@@ -245,8 +245,8 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 			var sw int32
 
 			cli, err := NewReconnectClient(
-				DialerFunc(func() (*BaseClient, error) {
-					cli, err := Dial(url,
+				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+					cli, err := DialContext(ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
 					if err != nil {

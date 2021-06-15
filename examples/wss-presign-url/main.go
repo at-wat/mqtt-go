@@ -38,13 +38,13 @@ func main() {
 
 	cli, err := mqtt.NewReconnectClient(
 		// Dialer to connect/reconnect to the server.
-		mqtt.DialerFunc(func() (*mqtt.BaseClient, error) {
+		mqtt.DialerFunc(func(ctx context.Context) (*mqtt.BaseClient, error) {
 			// Presign URL here.
 			url := fmt.Sprintf("wss://%s:9443?token=%x",
 				host, time.Now().UnixNano(),
 			)
 			println("New URL:", url)
-			return mqtt.Dial(url,
+			return mqtt.DialContext(ctx, url,
 				mqtt.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 				mqtt.WithConnStateHandler(func(s mqtt.ConnState, err error) {
 					fmt.Printf("State changed to %s (err: %v)\n", s, err)
