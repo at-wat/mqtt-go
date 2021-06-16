@@ -7,9 +7,8 @@
 Update:
 ```diff
 -cli, err := mqtt.Dial(url)
--if err != nil { ... }
 +cli, err := mqtt.DialContext(ctx, url)
-+if err != nil { ... }
+ if err != nil { ... }
  _, err := cli.Connect(ctx, ...)
 ```
 
