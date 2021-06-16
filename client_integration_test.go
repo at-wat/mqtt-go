@@ -26,15 +26,6 @@ import (
 	"time"
 )
 
-var (
-	urls = map[string]string{
-		"MQTT":       "mqtt://localhost:1883",
-		"MQTTs":      "mqtts://localhost:8883",
-		"WebSocket":  "ws://localhost:9001",
-		"WebSockets": "wss://localhost:9443",
-	}
-)
-
 func ExampleClient() {
 	done := make(chan struct{})
 

@@ -23,6 +23,15 @@ import (
 	"time"
 )
 
+var (
+	urls = map[string]string{
+		"MQTT":       "mqtt://localhost:1883",
+		"MQTTs":      "mqtts://localhost:8883",
+		"WebSocket":  "ws://localhost:9001",
+		"WebSockets": "wss://localhost:9443",
+	}
+)
+
 func TestDialOptionError(t *testing.T) {
 	errExpected := errors.New("an error")
 	optErr := func() DialOption {
@@ -60,6 +69,21 @@ func TestDial_InvalidURL(t *testing.T) {
 		context.TODO(), "://localhost",
 	); !strings.Contains(err.Error(), "missing protocol scheme") {
 		t.Errorf("Expected error: 'missing protocol scheme', got: '%v'", err)
+	}
+}
+
+func TestDial_ContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			if _, err := DialContext(
+				ctx, url,
+			); !strings.Contains(err.Error(), "dial tcp: operation was canceled") {
+				t.Errorf("Expected error: '%v', got: '%v'", context.DeadlineExceeded, err)
+			}
+		})
 	}
 }
 
