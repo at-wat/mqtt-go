@@ -8,8 +8,12 @@ Update:
 ```diff
 -cli, err := mqtt.Dial(url)
 +cli, err := mqtt.DialContext(ctx, url)
- if err != nil { ... }
- _, err := cli.Connect(ctx, ...)
+ if err != nil {
+   // error handling
+ }
+ if _, err := cli.Connect(ctx, ...); err != nil {
+   // error handling
+ }
 ```
 
 If `mqtt.DialerFunc` is used, update:
