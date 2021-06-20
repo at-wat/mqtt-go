@@ -17,6 +17,7 @@ package mqtt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -85,6 +86,29 @@ func TestDial_ContextCancel(t *testing.T) {
 			}
 		})
 	}
+}
+
+type oldDialerImpl struct{}
+
+func (d oldDialerImpl) Dial() (*BaseClient, error) {
+	return &BaseClient{}, nil
+}
+
+func oldDialer() NoContextDialerIface {
+	return &oldDialerImpl{}
+}
+
+func ExampleNoContextDialer() {
+	d := oldDialer()
+	cli, err := NewReconnectClient(&NoContextDialer{d})
+	if err != nil {
+		fmt.Println("error:", err.Error())
+		return
+	}
+	cli.Handle(HandlerFunc(func(*Message) {}))
+	fmt.Println("ok")
+
+	// output: ok
 }
 
 func ExampleBaseClientStoreDialer() {

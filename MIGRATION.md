@@ -19,6 +19,10 @@
     -mqtt.DialerFunc(func() (*mqtt.BaseClient, error) {
     +mqtt.DialerFunc(func(ctx context.Context) (*mqtt.BaseClient, error) {
     ```
+  - 🔄If you want to use `mqtt.Dialer` interface of mqtt-go<1.14, wrap dialer by:
+    ```go
+    &mqtt.NoContextDialer{oldDialer}
+    ```
 
 ## v0.12.0
 

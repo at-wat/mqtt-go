@@ -31,12 +31,6 @@ import (
 // ErrUnsupportedProtocol means that the specified scheme in the URL is not supported.
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 
-// URLDialer is a Dialer using URL string.
-type URLDialer struct {
-	URL     string
-	Options []DialOption
-}
-
 // Dialer is an interface to create connection.
 type Dialer interface {
 	DialContext(context.Context) (*BaseClient, error)
@@ -48,6 +42,31 @@ type DialerFunc func(ctx context.Context) (*BaseClient, error)
 // DialContext calls d().
 func (d DialerFunc) DialContext(ctx context.Context) (*BaseClient, error) {
 	return d(ctx)
+}
+
+// NoContextDialerIface is a Dialer interface of mqtt-go<1.14.
+type NoContextDialerIface interface {
+	Dial() (*BaseClient, error)
+}
+
+// NoContextDialer is a wrapper to use Dialer of mqtt-go<1.14 as mqtt-go>=1.14 Dialer.
+//
+// WARNING: passed context is ignored by NoContextDialer. Make sure timeout is handled inside NoContextDialer.
+type NoContextDialer struct {
+	NoContextDialerIface
+}
+
+// DialContext wraps Dial without context.
+//
+// WARNING: passed context is ignored by NoContextDialer. Make sure timeout is handled inside NoContextDialer.
+func (d *NoContextDialer) DialContext(context.Context) (*BaseClient, error) {
+	return d.Dial()
+}
+
+// URLDialer is a Dialer using URL string.
+type URLDialer struct {
+	URL     string
+	Options []DialOption
 }
 
 // DialContext creates connection using its values.
