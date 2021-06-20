@@ -11,6 +11,11 @@
 - Thread-safe
   > All functions and structs are safe to be used from multiple goroutines.
 
+## Migration guide
+
+- [v0.14.0](MIGRATION.md#v0140)
+- [v0.12.0](MIGRATION.md#v0120)
+
 ## Examples
 
 - [MQTTs with client certificate](examples/mqtts-client-cert)
