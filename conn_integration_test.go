@@ -54,9 +54,10 @@ func TestIntegration_WithTLSCertFiles(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			cli, err := Dial(urls["MQTTs"],
-				c.opt,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			cli, err := DialContext(ctx, urls["MQTTs"], c.opt)
 
 			if err != nil {
 				if c.expectError {
@@ -70,8 +71,6 @@ func TestIntegration_WithTLSCertFiles(t *testing.T) {
 				t.Fatal("Expected error but succeeded")
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
 			if _, err := cli.Connect(ctx, "TestConnTLS", WithCleanSession(true)); err != nil {
 				t.Error(err)
 			}

@@ -17,10 +17,20 @@ package mqtt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
 	"time"
+)
+
+var (
+	urls = map[string]string{
+		"MQTT":       "mqtt://localhost:1883",
+		"MQTTs":      "mqtts://localhost:8883",
+		"WebSocket":  "ws://localhost:9001",
+		"WebSockets": "wss://localhost:9443",
+	}
 )
 
 func TestDialOptionError(t *testing.T) {
@@ -31,13 +41,16 @@ func TestDialOptionError(t *testing.T) {
 		}
 	}
 
-	if _, err := Dial("mqtt://localhost:1883", optErr()); err != errExpected {
+	if _, err := DialContext(
+		context.TODO(), "mqtt://localhost:1883", optErr(),
+	); err != errExpected {
 		t.Errorf("Expected error: '%v', got: '%v'", errExpected, err)
 	}
 }
 
 func TestDialOption_WithDialer(t *testing.T) {
-	if _, err := Dial("mqtt://localhost:1884",
+	if _, err := DialContext(
+		context.TODO(), "mqtt://localhost:1884",
 		WithDialer(&net.Dialer{Timeout: time.Nanosecond}),
 	); !strings.Contains(err.Error(), "timeout") {
 		t.Errorf("Expected timeout error, got: '%v'", err)
@@ -45,15 +58,57 @@ func TestDialOption_WithDialer(t *testing.T) {
 }
 
 func TestDial_UnsupportedProtocol(t *testing.T) {
-	if _, err := Dial("unknown://localhost:1884"); !errors.Is(err, ErrUnsupportedProtocol) {
+	if _, err := DialContext(
+		context.TODO(), "unknown://localhost:1884",
+	); !errors.Is(err, ErrUnsupportedProtocol) {
 		t.Errorf("Expected error: '%v', got: '%v'", ErrUnsupportedProtocol, err)
 	}
 }
 
 func TestDial_InvalidURL(t *testing.T) {
-	if _, err := Dial("://localhost"); !strings.Contains(err.Error(), "missing protocol scheme") {
+	if _, err := DialContext(
+		context.TODO(), "://localhost",
+	); !strings.Contains(err.Error(), "missing protocol scheme") {
 		t.Errorf("Expected error: 'missing protocol scheme', got: '%v'", err)
 	}
+}
+
+func TestDial_ContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	for name, url := range urls {
+		t.Run(name, func(t *testing.T) {
+			if _, err := DialContext(
+				ctx, url,
+			); !strings.Contains(err.Error(), "dial tcp: operation was canceled") {
+				t.Errorf("Expected error: '%v', got: '%v'", context.DeadlineExceeded, err)
+			}
+		})
+	}
+}
+
+type oldDialerImpl struct{}
+
+func (d oldDialerImpl) Dial() (*BaseClient, error) {
+	return &BaseClient{}, nil
+}
+
+func oldDialer() NoContextDialerIface {
+	return &oldDialerImpl{}
+}
+
+func ExampleNoContextDialer() {
+	d := oldDialer()
+	cli, err := NewReconnectClient(&NoContextDialer{d})
+	if err != nil {
+		fmt.Println("error:", err.Error())
+		return
+	}
+	cli.Handle(HandlerFunc(func(*Message) {}))
+	fmt.Println("ok")
+
+	// output: ok
 }
 
 func ExampleBaseClientStoreDialer() {

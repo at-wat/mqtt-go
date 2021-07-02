@@ -148,7 +148,7 @@ func TestIntegration_Will(t *testing.T) {
 	defer cancel()
 
 	will := make(chan *mqtt.Message, 100)
-	cli0, err := mqtt.Dial("mqtt://localhost:1883")
+	cli0, err := mqtt.DialContext(ctx, "mqtt://localhost:1883")
 	if err != nil {
 		t.Fatalf("Unexpected error: '%v'", err)
 	}

@@ -156,8 +156,8 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 
 							chReceived := make(chan *Message, 100)
 							cli, err := NewReconnectClient(
-								DialerFunc(func() (*BaseClient, error) {
-									cli, err := Dial(url,
+								DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+									cli, err := DialContext(ctx, url,
 										WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 									)
 									if err != nil {
@@ -248,8 +248,8 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 					defer cancel()
 
-					cliRecv, err := Dial(
-						url,
+					cliRecv, err := DialContext(
+						ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
 					if err != nil {
@@ -294,8 +294,8 @@ func TestIntegration_ReconnectClient_RetryPublish(t *testing.T) {
 					chConnected := make(chan struct{}, 1)
 
 					cli, err := NewReconnectClient(
-						DialerFunc(func() (*BaseClient, error) {
-							cli, err := Dial(url,
+						DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+							cli, err := DialContext(ctx, url,
 								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 							)
 							if err != nil {
@@ -398,8 +398,8 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 
-			cliSend, err := Dial(
-				url,
+			cliSend, err := DialContext(
+				ctx, url,
 				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 			)
 			if err != nil {
@@ -415,8 +415,8 @@ func TestIntegration_ReconnectClient_RetrySubscribe(t *testing.T) {
 			chConnected := make(chan struct{}, 1)
 
 			cli, err := NewReconnectClient(
-				DialerFunc(func() (*BaseClient, error) {
-					cli, err := Dial(url,
+				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+					cli, err := DialContext(ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
 					if err != nil {
@@ -622,8 +622,8 @@ func TestIntegration_ReconnectClient_KeepAliveError(t *testing.T) {
 	chErr := make(chan error)
 
 	cli, err := NewReconnectClient(
-		DialerFunc(func() (*BaseClient, error) {
-			cli, err := Dial(urls["MQTT"],
+		DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+			cli, err := DialContext(ctx, urls["MQTT"],
 				WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 			)
 			if err != nil {
@@ -677,8 +677,8 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 
-					cliRaw, err := Dial(
-						url,
+					cliRaw, err := DialContext(
+						ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 					)
 					if err != nil {

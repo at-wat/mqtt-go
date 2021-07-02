@@ -17,6 +17,7 @@
 package mqtt
 
 import (
+	"context"
 	"crypto/tls"
 	"testing"
 )
@@ -35,7 +36,9 @@ func TestIntegration_BaseClientStoreDialer(t *testing.T) {
 		t.Errorf("Initial BaseClient() is expected to be nil, got %p", cli)
 	}
 
-	cli1, err := d.Dial()
+	ctx := context.TODO()
+
+	cli1, err := d.DialContext(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +47,7 @@ func TestIntegration_BaseClientStoreDialer(t *testing.T) {
 		t.Errorf("Expected BaseClient(): %p, got: %p", cli1, cli)
 	}
 
-	cli2, err := d.Dial()
+	cli2, err := d.DialContext(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

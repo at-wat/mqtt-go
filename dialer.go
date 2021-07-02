@@ -15,6 +15,7 @@
 package mqtt
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -30,32 +31,51 @@ import (
 // ErrUnsupportedProtocol means that the specified scheme in the URL is not supported.
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 
+// Dialer is an interface to create connection.
+type Dialer interface {
+	DialContext(context.Context) (*BaseClient, error)
+}
+
+// DialerFunc type is an adapter to use functions as MQTT connection dialer.
+type DialerFunc func(ctx context.Context) (*BaseClient, error)
+
+// DialContext calls d().
+func (d DialerFunc) DialContext(ctx context.Context) (*BaseClient, error) {
+	return d(ctx)
+}
+
+// NoContextDialerIface is a Dialer interface of mqtt-go<1.14.
+type NoContextDialerIface interface {
+	Dial() (*BaseClient, error)
+}
+
+// NoContextDialer is a wrapper to use Dialer of mqtt-go<1.14 as mqtt-go>=1.14 Dialer.
+//
+// WARNING: passed context is ignored by NoContextDialer. Make sure timeout is handled inside NoContextDialer.
+type NoContextDialer struct {
+	NoContextDialerIface
+}
+
+// DialContext wraps Dial without context.
+//
+// WARNING: passed context is ignored by NoContextDialer. Make sure timeout is handled inside NoContextDialer.
+func (d *NoContextDialer) DialContext(context.Context) (*BaseClient, error) {
+	return d.Dial()
+}
+
 // URLDialer is a Dialer using URL string.
 type URLDialer struct {
 	URL     string
 	Options []DialOption
 }
 
-// Dialer is an interface to create connection.
-type Dialer interface {
-	Dial() (*BaseClient, error)
+// DialContext creates connection using its values.
+func (d *URLDialer) DialContext(ctx context.Context) (*BaseClient, error) {
+	return DialContext(ctx, d.URL, d.Options...)
 }
 
-// DialerFunc type is an adapter to use functions as MQTT connection dialer.
-type DialerFunc func() (*BaseClient, error)
-
-// Dial calls d().
-func (d DialerFunc) Dial() (*BaseClient, error) {
-	return d()
-}
-
-// Dial creates connection using its values.
-func (d *URLDialer) Dial() (*BaseClient, error) {
-	return Dial(d.URL, d.Options...)
-}
-
-// Dial creates MQTT client using URL string.
-func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
+// DialContext creates MQTT client using URL string.
+func DialContext(ctx context.Context, urlStr string, opts ...DialOption) (*BaseClient, error) {
 	o := &DialOptions{
 		Dialer: &net.Dialer{},
 	}
@@ -64,7 +84,7 @@ func Dial(urlStr string, opts ...DialOption) (*BaseClient, error) {
 			return nil, err
 		}
 	}
-	return o.dial(urlStr)
+	return o.dial(ctx, urlStr)
 }
 
 // DialOption sets option for Dial.
@@ -135,7 +155,7 @@ func WithConnStateHandler(handler func(ConnState, error)) DialOption {
 	}
 }
 
-func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
+func (d *DialOptions) dial(ctx context.Context, urlStr string) (*BaseClient, error) {
 	c := &BaseClient{
 		ConnState:     d.ConnState,
 		MaxPayloadLen: d.MaxPayloadLen,
@@ -146,34 +166,36 @@ func (d *DialOptions) dial(urlStr string) (*BaseClient, error) {
 		return nil, err
 	}
 	switch u.Scheme {
+	case "tcp", "mqtt", "tls", "ssl", "mqtts", "wss", "ws":
+	default:
+		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
+	}
+
+	baseConn, err := d.Dialer.DialContext(ctx, "tcp", u.Host)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
 	case "tcp", "mqtt":
-		conn, err := d.Dialer.Dial("tcp", u.Host)
-		if err != nil {
-			return nil, err
-		}
-		c.Transport = conn
+		c.Transport = baseConn
 	case "tls", "ssl", "mqtts":
-		conn, err := tls.DialWithDialer(d.Dialer, "tcp", u.Host, d.TLSConfig)
-		if err != nil {
-			return nil, err
-		}
-		c.Transport = conn
-	case "ws", "wss":
+		c.Transport = tls.Client(baseConn, d.TLSConfig)
+	case "wss":
+		baseConn = tls.Client(baseConn, d.TLSConfig)
+		fallthrough
+	case "ws":
 		wsc, err := websocket.NewConfig(u.String(), fmt.Sprintf("https://%s", u.Host))
 		if err != nil {
 			return nil, err
 		}
 		wsc.Protocol = append(wsc.Protocol, "mqtt")
-		wsc.Dialer = d.Dialer
 		wsc.TlsConfig = d.TLSConfig
-		ws, err := websocket.DialConfig(wsc)
+		ws, err := websocket.NewClient(wsc, baseConn)
 		if err != nil {
 			return nil, err
 		}
 		ws.PayloadType = websocket.BinaryFrame
 		c.Transport = ws
-	default:
-		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
 	}
 	return c, nil
 }
@@ -187,9 +209,9 @@ type BaseClientStoreDialer struct {
 	baseClient *BaseClient
 }
 
-// Dial creates a new BaseClient.
-func (d *BaseClientStoreDialer) Dial() (*BaseClient, error) {
-	cli, err := d.Dialer.Dial()
+// DialContext creates a new BaseClient.
+func (d *BaseClientStoreDialer) DialContext(ctx context.Context) (*BaseClient, error) {
+	cli, err := d.Dialer.DialContext(ctx)
 	d.mu.Lock()
 	d.baseClient = cli
 	d.mu.Unlock()
