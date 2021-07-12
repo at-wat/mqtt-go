@@ -28,6 +28,13 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+var defaultPorts = map[string]uint16{
+	"mqtt":  1883,
+	"mqtts": 8883,
+	"wss":   443,
+	"ws":    80,
+}
+
 // ErrUnsupportedProtocol means that the specified scheme in the URL is not supported.
 var ErrUnsupportedProtocol = errors.New("unsupported protocol")
 
@@ -76,15 +83,25 @@ func (d *URLDialer) DialContext(ctx context.Context) (*BaseClient, error) {
 
 // DialContext creates MQTT client using URL string.
 func DialContext(ctx context.Context, urlStr string, opts ...DialOption) (*BaseClient, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
 	o := &DialOptions{
 		Dialer: &net.Dialer{},
+	}
+	switch u.Scheme {
+	case "tls", "ssl", "mqtts", "wss":
+		o.TLSConfig = &tls.Config{
+			ServerName: u.Hostname(),
+		}
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
 			return nil, err
 		}
 	}
-	return o.dial(ctx, urlStr)
+	return o.dial(ctx, u)
 }
 
 // DialOption sets option for Dial.
@@ -155,25 +172,27 @@ func WithConnStateHandler(handler func(ConnState, error)) DialOption {
 	}
 }
 
-func (d *DialOptions) dial(ctx context.Context, urlStr string) (*BaseClient, error) {
+func (d *DialOptions) dial(ctx context.Context, u *url.URL) (*BaseClient, error) {
 	c := &BaseClient{
 		ConnState:     d.ConnState,
 		MaxPayloadLen: d.MaxPayloadLen,
 	}
 
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, err
-	}
 	switch u.Scheme {
 	case "tcp", "mqtt", "tls", "ssl", "mqtts", "wss", "ws":
 	default:
 		return nil, wrapErrorf(ErrUnsupportedProtocol, "protocol %s", u.Scheme)
 	}
+	hostWithPort := u.Host
+	if u.Port() == "" {
+		if port, ok := defaultPorts[u.Scheme]; ok {
+			hostWithPort += fmt.Sprintf(":%d", port)
+		}
+	}
 
-	baseConn, err := d.Dialer.DialContext(ctx, "tcp", u.Host)
+	baseConn, err := d.Dialer.DialContext(ctx, "tcp", hostWithPort)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err, "dialing tcp")
 	}
 	switch u.Scheme {
 	case "tcp", "mqtt":
@@ -186,13 +205,13 @@ func (d *DialOptions) dial(ctx context.Context, urlStr string) (*BaseClient, err
 	case "ws":
 		wsc, err := websocket.NewConfig(u.String(), fmt.Sprintf("https://%s", u.Host))
 		if err != nil {
-			return nil, err
+			return nil, wrapError(err, "configuring websocket")
 		}
 		wsc.Protocol = append(wsc.Protocol, "mqtt")
 		wsc.TlsConfig = d.TLSConfig
 		ws, err := websocket.NewClient(wsc, baseConn)
 		if err != nil {
-			return nil, err
+			return nil, wrapError(err, "dialing websocket")
 		}
 		ws.PayloadType = websocket.BinaryFrame
 		c.Transport = ws
