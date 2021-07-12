@@ -31,6 +31,12 @@ var (
 		"WebSocket":  "ws://localhost:9001",
 		"WebSockets": "wss://localhost:9443",
 	}
+	urlsWithoutPort = map[string]string{
+		"MQTT":       "mqtt://localhost",
+		"MQTTs":      "mqtts://localhost",
+		"WebSocket":  "ws://localhost",
+		"WebSockets": "wss://localhost",
+	}
 )
 
 func TestDialOptionError(t *testing.T) {

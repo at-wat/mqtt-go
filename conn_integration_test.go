@@ -23,6 +23,10 @@ import (
 )
 
 func TestIntegration_WithTLSCertFiles(t *testing.T) {
+	// Overwrite default port to avoid using privileged port during test.
+	defaultPorts["ws"] = 9001
+	defaultPorts["wss"] = 9443
+
 	cases := map[string]struct {
 		opt         DialOption
 		expectError bool
@@ -52,31 +56,39 @@ func TestIntegration_WithTLSCertFiles(t *testing.T) {
 			false,
 		},
 	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+	test := func(t *testing.T, urls map[string]string) {
+		for name, c := range cases {
+			t.Run(name, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
 
-			cli, err := DialContext(ctx, urls["MQTTs"], c.opt)
+				cli, err := DialContext(ctx, urls["MQTTs"], c.opt)
 
-			if err != nil {
-				if c.expectError {
-					return
+				if err != nil {
+					if c.expectError {
+						return
+					}
+					t.Fatal(err)
 				}
-				t.Fatal(err)
-			}
-			defer cli.Close()
+				defer cli.Close()
 
-			if c.expectError {
-				t.Fatal("Expected error but succeeded")
-			}
+				if c.expectError {
+					t.Fatal("Expected error but succeeded")
+				}
 
-			if _, err := cli.Connect(ctx, "TestConnTLS", WithCleanSession(true)); err != nil {
-				t.Error(err)
-			}
-			if err := cli.Disconnect(ctx); err != nil {
-				t.Error(err)
-			}
-		})
+				if _, err := cli.Connect(ctx, "TestConnTLS", WithCleanSession(true)); err != nil {
+					t.Error(err)
+				}
+				if err := cli.Disconnect(ctx); err != nil {
+					t.Error(err)
+				}
+			})
+		}
 	}
+	t.Run("WithPort", func(t *testing.T) {
+		test(t, urls)
+	})
+	t.Run("WithoutPort", func(t *testing.T) {
+		test(t, urlsWithoutPort)
+	})
 }
