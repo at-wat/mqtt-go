@@ -16,6 +16,8 @@ package mqtt
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -66,6 +68,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 	if c.options.Timeout == time.Duration(0) {
 		c.options.Timeout = c.options.PingInterval
 	}
+
+	var errDial, errConnect error
 
 	done := make(chan struct{})
 	var doneOnce sync.Once
@@ -132,8 +136,12 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					case <-c.disconnected:
 						return
 					}
+				} else if err != ctxTimeout.Err() || errConnect == nil {
+					errConnect = err // Hold last connect error but avoid overwrote by context cancel.
 				}
 				cancel()
+			} else if err != ctx.Err() || errDial == nil {
+				errDial = err // Hold last dial error but avoid overwrote by context cancel.
 			}
 			select {
 			case <-time.After(reconnWait):
@@ -152,7 +160,18 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return false, wrapError(ctx.Err(), "establishing first connection")
+		var actualErrs []string
+		if errDial != nil {
+			actualErrs = append(actualErrs, fmt.Sprintf("dial: %v", errDial))
+		}
+		if errConnect != nil {
+			actualErrs = append(actualErrs, fmt.Sprintf("connect: %v", errConnect))
+		}
+		var errStr string
+		if len(actualErrs) > 0 {
+			errStr = fmt.Sprintf(" (%s)", strings.Join(actualErrs, ", "))
+		}
+		return false, wrapErrorf(ctx.Err(), "establishing first connection%s", errStr)
 	}
 	return sessionPresent, nil
 }
