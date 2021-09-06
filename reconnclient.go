@@ -137,11 +137,11 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 						return
 					}
 				} else if err != ctxTimeout.Err() {
-					errConnect.Store(err) // Hold last connect error but avoid overwrote by context cancel.
+					errConnect.Store(err) // Hold first connect error excepting context cancel.
 				}
 				cancel()
 			} else if err != ctx.Err() {
-				errDial.Store(err) // Hold last dial error but avoid overwrote by context cancel.
+				errDial.Store(err) // Hold first dial error excepting context cancel.
 			}
 			select {
 			case <-time.After(reconnWait):
