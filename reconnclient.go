@@ -69,7 +69,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 		c.options.Timeout = c.options.PingInterval
 	}
 
-	var errDial, errConnect error
+	var errDial, errConnect firstError
 
 	done := make(chan struct{})
 	var doneOnce sync.Once
@@ -136,12 +136,12 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					case <-c.disconnected:
 						return
 					}
-				} else if err != ctxTimeout.Err() || errConnect == nil {
-					errConnect = err // Hold last connect error but avoid overwrote by context cancel.
+				} else if err != ctxTimeout.Err() {
+					errConnect.Store(err) // Hold last connect error but avoid overwrote by context cancel.
 				}
 				cancel()
-			} else if err != ctx.Err() || errDial == nil {
-				errDial = err // Hold last dial error but avoid overwrote by context cancel.
+			} else if err != ctx.Err() {
+				errDial.Store(err) // Hold last dial error but avoid overwrote by context cancel.
 			}
 			select {
 			case <-time.After(reconnWait):
@@ -161,11 +161,11 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 	case <-done:
 	case <-ctx.Done():
 		var actualErrs []string
-		if errDial != nil {
-			actualErrs = append(actualErrs, fmt.Sprintf("dial: %v", errDial))
+		if err := errDial.Load(); err != nil {
+			actualErrs = append(actualErrs, fmt.Sprintf("dial: %v", err))
 		}
-		if errConnect != nil {
-			actualErrs = append(actualErrs, fmt.Sprintf("connect: %v", errConnect))
+		if err := errConnect.Load(); err != nil {
+			actualErrs = append(actualErrs, fmt.Sprintf("connect: %v", err))
 		}
 		var errStr string
 		if len(actualErrs) > 0 {
