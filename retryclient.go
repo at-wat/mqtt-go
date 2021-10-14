@@ -324,6 +324,11 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			c.muStats.Unlock()
 
 			task(ctx, cli)
+
+			if len(c.retryQueue) != 0 {
+				_ = cli.Close()
+				connected = false
+			}
 		}
 	}()
 }
