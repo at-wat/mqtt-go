@@ -30,12 +30,13 @@ type RetryClient struct {
 	chConnectErr chan error
 	chConnSwitch chan struct{}
 
-	retryQueue     []retryFn
-	subEstablished subscriptions // acknoledged subscriptions
-	mu             sync.RWMutex
-	handler        Handler
-	chTask         chan struct{}
-	taskQueue      []func(ctx context.Context, cli *BaseClient)
+	newRetryByError bool
+	retryQueue      []retryFn
+	subEstablished  subscriptions // acknoledged subscriptions
+	mu              sync.RWMutex
+	handler         Handler
+	chTask          chan struct{}
+	taskQueue       []func(ctx context.Context, cli *BaseClient)
 
 	muStats sync.RWMutex
 	stats   RetryStats
@@ -142,6 +143,7 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.Retry)
+				c.newRetryByError = true
 			}
 		}
 		return
@@ -179,6 +181,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.Retry)
+				c.newRetryByError = true
 			}
 		}
 		return nil
@@ -207,6 +210,7 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 			}
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.Retry)
+				c.newRetryByError = true
 			}
 		}
 		return nil
@@ -317,7 +321,6 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			cli := c.cli
 			task := c.taskQueue[0]
 			c.taskQueue = c.taskQueue[1:]
-			remainedTasks := len(c.taskQueue)
 			c.mu.Unlock()
 
 			c.muStats.Lock()
@@ -326,9 +329,10 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 
 			task(ctx, cli)
 
-			if len(c.retryQueue) != 0 && remainedTasks == 0 {
+			if c.newRetryByError {
 				_ = cli.Close()
 				connected = false
+				c.newRetryByError = false
 			}
 		}
 	}()
