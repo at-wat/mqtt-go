@@ -48,7 +48,7 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (ReconnectClient
 		}
 	}
 	return &reconnectClient{
-		RetryClient:  &RetryClient{},
+		RetryClient:  &options.RetryClient,
 		done:         make(chan struct{}),
 		disconnected: make(chan struct{}),
 		options:      options,
@@ -201,6 +201,7 @@ type ReconnectOptions struct {
 	ReconnectWaitBase time.Duration
 	ReconnectWaitMax  time.Duration
 	PingInterval      time.Duration
+	RetryClient       RetryClient
 }
 
 // ReconnectOption sets option for Connect.
@@ -229,6 +230,15 @@ func WithReconnectWait(base, max time.Duration) ReconnectOption {
 func WithPingInterval(interval time.Duration) ReconnectOption {
 	return func(o *ReconnectOptions) error {
 		o.PingInterval = interval
+		return nil
+	}
+}
+
+// WithRetryClient sets RetryClient.
+// Default value is zero RetryClient.
+func WithRetryClient(cli RetryClient) ReconnectOption {
+	return func(o *ReconnectOptions) error {
+		o.RetryClient = cli
 		return nil
 	}
 }
