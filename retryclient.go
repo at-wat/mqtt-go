@@ -294,9 +294,9 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			c.taskQueue = c.taskQueue[1:]
 			c.mu.Unlock()
 
-			c.muStats.RLock()
+			c.muStats.Lock()
 			c.stats.TotalTasks++
-			c.muStats.RUnlock()
+			c.muStats.Unlock()
 
 			task(ctx, cli)
 		}
@@ -361,9 +361,9 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		c.retryQueue = nil
 
 		for _, retry := range oldRetryQueue {
-			c.muStats.RLock()
+			c.muStats.Lock()
 			c.stats.TotalRetries++
-			c.muStats.RUnlock()
+			c.muStats.Unlock()
 
 			err := retry(ctx, cli)
 			if retryErr, ok := err.(ErrorWithRetry); ok {
