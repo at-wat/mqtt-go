@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 // ErrClosedClient means operation was requested on closed client.
@@ -38,6 +39,14 @@ type RetryClient struct {
 
 	muStats sync.RWMutex
 	stats   RetryStats
+
+	// Maximum duration to wait for acknoledge response.
+	// Messages with QoS1 and QoS2 will be retried.
+	ResponseTimeout time.Duration
+
+	// Directly publish QoS0 messages without queuing.
+	// It will cause inorder of the messages but performance may be increased.
+	DirectlyPublishQoS0 bool
 }
 
 // Retryer is an interface to control message retrying.
@@ -85,6 +94,10 @@ func (c *RetryClient) Publish(ctx context.Context, message *Message) error {
 	cli := c.cli
 	c.mu.RUnlock()
 
+	if c.DirectlyPublishQoS0 && message.QoS == QoS0 {
+		return cli.Publish(ctx, message)
+	}
+
 	if cli != nil {
 		if err := cli.ValidateMessage(message); err != nil {
 			return wrapError(err, "validating publishing message")
@@ -118,7 +131,9 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 		return
 	}
 	publish := func(ctx context.Context, cli *BaseClient, message *Message) {
-		if err := cli.Publish(ctx, message); err != nil {
+		ctx2, cancel := c.requestContext(ctx)
+		defer cancel()
+		if err := cli.Publish(ctx2, message); err != nil {
 			select {
 			case <-ctx.Done():
 				// User cancelled; don't queue.
@@ -150,7 +165,10 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient, subs ...Subscription) {
 	subscribe := func(ctx context.Context, cli *BaseClient) error {
 		subscriptions(subs).applyTo(&c.subEstablished)
-		if _, err := cli.Subscribe(ctx, subs...); err != nil {
+
+		ctx2, cancel := c.requestContext(ctx)
+		defer cancel()
+		if _, err := cli.Subscribe(ctx2, subs...); err != nil {
 			select {
 			case <-ctx.Done():
 				if !retry {
@@ -177,7 +195,10 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics ...string) {
 	unsubscribe := func(ctx context.Context, cli *BaseClient) error {
 		unsubscriptions(topics).applyTo(&c.subEstablished)
-		if err := cli.Unsubscribe(ctx, topics...); err != nil {
+
+		ctx2, cancel := c.requestContext(ctx)
+		defer cancel()
+		if err := cli.Unsubscribe(ctx2, topics...); err != nil {
 			select {
 			case <-ctx.Done():
 				// User cancelled; don't queue.
@@ -202,7 +223,9 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
 	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
-		cli.Disconnect(ctx)
+		ctx2, cancel := c.requestContext(ctx)
+		defer cancel()
+		cli.Disconnect(ctx2)
 		c.mu.Lock()
 		close(c.chTask)
 		c.mu.Unlock()
@@ -214,7 +237,9 @@ func (c *RetryClient) Ping(ctx context.Context) error {
 	c.mu.RLock()
 	cli := c.cli
 	c.mu.RUnlock()
-	return wrapError(cli.Ping(ctx), "retryclient: pinging")
+	ctx2, cancel := c.requestContext(ctx)
+	defer cancel()
+	return wrapError(cli.Ping(ctx2), "retryclient: pinging")
 }
 
 // Client returns the base client.
@@ -301,6 +326,13 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			task(ctx, cli)
 		}
 	}()
+}
+
+func (c *RetryClient) requestContext(ctx context.Context) (context.Context, func()) {
+	if c.ResponseTimeout == 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, c.ResponseTimeout)
 }
 
 func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Context, cli *BaseClient)) error {
