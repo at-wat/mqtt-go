@@ -340,10 +340,19 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 				// Mosquitto WebSocket sometimes requires extra time to connect
 				// and retry number may be increased.
 				time.Sleep(50 * time.Millisecond)
-				expectRetryStats(t, RetryStats{
-					TotalTasks:   2,
-					TotalRetries: 1,
-				}, cli.Stats())
+				stats := cli.Stats()
+				if stats.QueuedTasks != 0 {
+					t.Errorf("Expected no queued tasks, actual: %d", stats.QueuedTasks)
+				}
+				if stats.QueuedRetries != 0 {
+					t.Errorf("Expected no queued retries, actual: %d", stats.QueuedRetries)
+				}
+				if stats.TotalTasks < 2 {
+					t.Errorf("Expected total tasks: at least 2, actual: %d", stats.TotalTasks)
+				}
+				if stats.TotalRetries < 1 {
+					t.Errorf("Expected total retries: at least 1, actual: %d", stats.TotalRetries)
+				}
 			}
 
 			cli.Disconnect(ctx)
