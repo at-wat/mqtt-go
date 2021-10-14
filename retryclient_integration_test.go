@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 // Copyright 2019 The mqtt-go authors.
@@ -26,6 +27,22 @@ import (
 	"github.com/at-wat/mqtt-go/internal/filteredpipe"
 )
 
+func expectRetryStats(t *testing.T, expected, actual RetryStats) {
+	t.Helper()
+	if expected.QueuedTasks != actual.QueuedTasks {
+		t.Errorf("Expected queued tasks: %d, actual: %d", expected.QueuedTasks, actual.QueuedTasks)
+	}
+	if expected.QueuedRetries != actual.QueuedRetries {
+		t.Errorf("Expected queued retries: %d, actual: %d", expected.QueuedRetries, actual.QueuedRetries)
+	}
+	if expected.TotalTasks != actual.TotalTasks {
+		t.Errorf("Expected total tasks: %d, actual: %d", expected.TotalTasks, actual.TotalTasks)
+	}
+	if expected.TotalRetries != actual.TotalRetries {
+		t.Errorf("Expected total retries: %d, actual: %d", expected.TotalRetries, actual.TotalRetries)
+	}
+}
+
 func TestIntegration_RetryClient(t *testing.T) {
 	for name, url := range urls {
 		t.Run(name, func(t *testing.T) {
@@ -51,6 +68,11 @@ func TestIntegration_RetryClient(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
+
+			time.Sleep(50 * time.Millisecond)
+			expectRetryStats(t, RetryStats{
+				TotalTasks: 1,
+			}, cli.Stats())
 
 			if err := cli.Disconnect(ctx); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -197,6 +219,7 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 					if withWait {
 						time.Sleep(50 * time.Millisecond)
 					}
+
 					cli.SetClient(ctx, cliBase)
 
 					if withWait {
@@ -210,6 +233,12 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 					}
 					if withWait {
 						time.Sleep(50 * time.Millisecond)
+
+						if pubAt == pubBeforeSetClient || pubAt == pubBeforeConnect {
+							expectRetryStats(t, RetryStats{
+								QueuedTasks: 100,
+							}, cli.Stats())
+						}
 					}
 
 					if _, err := cli.Connect(ctx, "RetryClientQueue"); err != nil {
@@ -225,6 +254,10 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 						t.Errorf("Timeout (cnt=%d)", cnt)
 					case <-ctxDone.Done():
 					}
+
+					expectRetryStats(t, RetryStats{
+						TotalTasks: 100,
+					}, cli.Stats())
 
 					if err := cli.Disconnect(ctx); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
@@ -273,10 +306,24 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 			}
 			time.Sleep(100 * time.Millisecond)
 
+			expectRetryStats(t, RetryStats{
+				QueuedTasks: 1,
+			}, cli.Stats())
+
 			// Disconnect
 			atomic.StoreInt32(&sw, 1)
 			go func() {
 				time.Sleep(300 * time.Millisecond)
+
+				if name == "MQTT" || name == "MQTTs" {
+					// Mosquitto WebSocket sometimes requires extra time to connect
+					// and retry number may be increased.
+					expectRetryStats(t, RetryStats{
+						TotalTasks:    1, // first try to subscribe (failed)
+						QueuedRetries: 1,
+					}, cli.Stats())
+				}
+
 				// Connect
 				atomic.StoreInt32(&sw, 0)
 			}()
@@ -287,6 +334,16 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 
 			if err := ctx.Err(); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if name == "MQTT" || name == "MQTTs" {
+				// Mosquitto WebSocket sometimes requires extra time to connect
+				// and retry number may be increased.
+				time.Sleep(50 * time.Millisecond)
+				expectRetryStats(t, RetryStats{
+					TotalTasks:   2,
+					TotalRetries: 1,
+				}, cli.Stats())
 			}
 
 			cli.Disconnect(ctx)

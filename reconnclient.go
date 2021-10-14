@@ -30,8 +30,14 @@ type reconnectClient struct {
 	disconnected chan struct{}
 }
 
+// ReconnectClient is a Client with reconnect and retry features.
+type ReconnectClient interface {
+	Client
+	Retryer
+}
+
 // NewReconnectClient creates a MQTT client with re-connect/re-publish/re-subscribe features.
-func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (Client, error) {
+func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (ReconnectClient, error) {
 	options := &ReconnectOptions{
 		ReconnectWaitBase: time.Second,
 		ReconnectWaitMax:  10 * time.Second,
