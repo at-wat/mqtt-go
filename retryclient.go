@@ -34,6 +34,7 @@ type RetryClient struct {
 	mu             sync.RWMutex
 	handler        Handler
 	chTask         chan struct{}
+	stopped        bool
 	taskQueue      []func(ctx context.Context, cli *BaseClient)
 }
 
@@ -170,12 +171,14 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
+	err := wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		cli.Disconnect(ctx)
-		c.mu.Lock()
-		close(c.chTask)
-		c.mu.Unlock()
 	}), "retryclient: disconnecting")
+	c.mu.Lock()
+	close(c.chTask)
+	c.stopped = true
+	c.mu.Unlock()
+	return err
 }
 
 // Ping to the broker.
@@ -272,12 +275,8 @@ func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Contex
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	select {
-	case _, ok := <-c.chTask:
-		if !ok {
-			return ErrClosedClient
-		}
-	default:
+	if c.stopped {
+		return ErrClosedClient
 	}
 
 	c.taskQueue = append(c.taskQueue, task)
