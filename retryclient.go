@@ -170,12 +170,13 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 
 // Disconnect from the broker.
 func (c *RetryClient) Disconnect(ctx context.Context) error {
-	return wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
+	err := wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		cli.Disconnect(ctx)
-		c.mu.Lock()
-		close(c.chTask)
-		c.mu.Unlock()
 	}), "retryclient: disconnecting")
+	c.mu.Lock()
+	close(c.chTask)
+	c.mu.Unlock()
+	return err
 }
 
 // Ping to the broker.
