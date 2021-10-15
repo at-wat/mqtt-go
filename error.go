@@ -41,6 +41,16 @@ func (e *errorWithRetry) Retry(ctx context.Context, cli *BaseClient) error {
 	return e.retryFn(ctx, cli)
 }
 
+// RequestTimeoutError is a context deadline exceeded error caused by RetryClient.ResponseTimeout.
+type RequestTimeoutError struct {
+	error
+}
+
+// Error implements error.
+func (e *RequestTimeoutError) Error() string {
+	return fmt.Sprintf("request timeout exceeded: %v", e.error.Error())
+}
+
 type errorInterface interface {
 	Error() string
 	Unwrap() error

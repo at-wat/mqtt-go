@@ -49,6 +49,9 @@ type RetryClient struct {
 	// Directly publish QoS0 messages without queuing.
 	// It will cause inorder of the messages but performance may be increased.
 	DirectlyPublishQoS0 bool
+
+	// Callback to receive background errors on raw message publish/subscribe operations.
+	OnError func(error)
 }
 
 // Retryer is an interface to control message retrying.
@@ -136,6 +139,7 @@ func (c *RetryClient) publish(ctx context.Context, cli *BaseClient, message *Mes
 		ctx2, cancel := c.requestContext(ctx)
 		defer cancel()
 		if err := cli.Publish(ctx2, message); err != nil {
+			c.onError(err)
 			select {
 			case <-ctx.Done():
 				// User cancelled; don't queue.
@@ -172,6 +176,7 @@ func (c *RetryClient) subscribe(ctx context.Context, retry bool, cli *BaseClient
 		ctx2, cancel := c.requestContext(ctx)
 		defer cancel()
 		if _, err := cli.Subscribe(ctx2, subs...); err != nil {
+			c.onError(err)
 			select {
 			case <-ctx.Done():
 				if !retry {
@@ -203,6 +208,7 @@ func (c *RetryClient) unsubscribe(ctx context.Context, cli *BaseClient, topics .
 		ctx2, cancel := c.requestContext(ctx)
 		defer cancel()
 		if err := cli.Unsubscribe(ctx2, topics...); err != nil {
+			c.onError(err)
 			select {
 			case <-ctx.Done():
 				// User cancelled; don't queue.
@@ -230,7 +236,9 @@ func (c *RetryClient) Disconnect(ctx context.Context) error {
 	err := wrapError(c.pushTask(ctx, func(ctx context.Context, cli *BaseClient) {
 		ctx2, cancel := c.requestContext(ctx)
 		defer cancel()
-		cli.Disconnect(ctx2)
+		if err := cli.Disconnect(ctx2); err != nil {
+			c.onError(err)
+		}
 	}), "retryclient: disconnecting")
 	c.mu.Lock()
 	close(c.chTask)
@@ -345,7 +353,16 @@ func (c *RetryClient) requestContext(ctx context.Context) (context.Context, func
 	if c.ResponseTimeout == 0 {
 		return ctx, func() {}
 	}
-	return context.WithTimeout(ctx, c.ResponseTimeout)
+	ctx2, cancel := context.WithTimeout(ctx, c.ResponseTimeout)
+	return &requestContext{ctx2}, cancel
+}
+
+type requestContext struct {
+	context.Context
+}
+
+func (c *requestContext) Err() error {
+	return &RequestTimeoutError{c.Context.Err()}
 }
 
 func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Context, cli *BaseClient)) error {
@@ -362,6 +379,12 @@ func (c *RetryClient) pushTask(ctx context.Context, task func(ctx context.Contex
 	default:
 	}
 	return nil
+}
+
+func (c *RetryClient) onError(err error) {
+	if c.OnError != nil {
+		c.OnError(err)
+	}
 }
 
 // Connect to the broker.
