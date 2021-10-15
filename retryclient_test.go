@@ -20,6 +20,8 @@ import (
 	"testing"
 )
 
+var _ Retryer = &RetryClient{} // RetryClient must implement Retryer.
+
 func TestRetryClientPublish_MessageValidationError(t *testing.T) {
 	cli := &RetryClient{
 		cli: &BaseClient{
