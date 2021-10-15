@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 // Copyright 2020 The mqtt-go authors.
