@@ -36,6 +36,37 @@ type RetryClient struct {
 	chTask         chan struct{}
 	stopped        bool
 	taskQueue      []func(ctx context.Context, cli *BaseClient)
+
+	muStats sync.RWMutex
+	stats   RetryStats
+}
+
+// Retryer is an interface to control message retrying.
+type Retryer interface {
+	// SetClient sets the new BaseClient.
+	// Call Retry() and Resubscribe() to process queued messages and subscriptions.
+	// The BaseClient must be unconnected when it is passed to the RetryClient.
+	SetClient(ctx context.Context, cli *BaseClient)
+	// Client returns the base client.
+	Client() *BaseClient
+	// Resubscribe subscribes all established subscriptions.
+	Resubscribe(ctx context.Context)
+	// Retry all queued publish/subscribe requests.
+	Retry(ctx context.Context)
+	// Stat returns retry stats.
+	Stats() RetryStats
+}
+
+// RetryStats stores retry statistics.
+type RetryStats struct {
+	// Number of queued tasks.
+	QueuedTasks int
+	// Number of queued messages and subscriptions.
+	QueuedRetries int
+	// Total number of proceeded tasks.
+	TotalTasks int
+	// Total number of retries.
+	TotalRetries int
 }
 
 // Handle registers the message handler.
@@ -266,6 +297,10 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 			c.taskQueue = c.taskQueue[1:]
 			c.mu.Unlock()
 
+			c.muStats.Lock()
+			c.stats.TotalTasks++
+			c.muStats.Unlock()
+
 			task(ctx, cli)
 		}
 	}()
@@ -325,6 +360,10 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		c.retryQueue = nil
 
 		for _, retry := range oldRetryQueue {
+			c.muStats.Lock()
+			c.stats.TotalRetries++
+			c.muStats.Unlock()
+
 			err := retry(ctx, cli)
 			if retryErr, ok := err.(ErrorWithRetry); ok {
 				c.retryQueue = append(c.retryQueue, retryErr.Retry)
@@ -333,4 +372,18 @@ func (c *RetryClient) Retry(ctx context.Context) {
 			}
 		}
 	})
+}
+
+// Stat returns retry stats.
+func (c *RetryClient) Stats() RetryStats {
+	c.muStats.RLock()
+	stats := c.stats
+	c.muStats.RUnlock()
+
+	c.mu.RLock()
+	stats.QueuedTasks = len(c.taskQueue)
+	stats.QueuedRetries = len(c.retryQueue)
+	c.mu.RUnlock()
+
+	return stats
 }
