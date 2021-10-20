@@ -20,6 +20,8 @@ package mqtt
 import (
 	"context"
 	"crypto/tls"
+	"io"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -358,4 +360,139 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 			cli.Disconnect(ctx)
 		})
 	}
+}
+
+func baseCliRemovePacket(ctx context.Context, t *testing.T, packetPass func([]byte) bool) *BaseClient {
+	t.Helper()
+	cliBase, err := DialContext(ctx, urls["MQTT"], WithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+	if err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+	ca, cb := net.Pipe()
+	connOrig := cliBase.Transport
+	cliBase.Transport = cb
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := ca.Read(buf)
+			if err != nil {
+				return
+			}
+			if !packetPass(buf[:n]) {
+				continue
+			}
+			if _, err := connOrig.Write(buf[:n]); err != nil {
+				return
+			}
+		}
+	}()
+	go func() {
+		io.Copy(ca, connOrig)
+	}()
+	return cliBase
+}
+
+func TestIntegration_RetryClient_ResponseTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cli := &RetryClient{
+		ResponseTimeout: 50 * time.Millisecond,
+	}
+	cli.SetClient(ctx, baseCliRemovePacket(ctx, t, func(b []byte) bool {
+		return b[0] != byte(packetPublish)|byte(publishFlagQoS1)
+	}))
+
+	if _, err := cli.Connect(ctx, "RetryClientTimeout"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	if err := cli.Publish(ctx, &Message{
+		Topic:   "test/ResponseTimeout",
+		QoS:     QoS1,
+		Payload: []byte("message"),
+	}); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	select {
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Timeout")
+	case <-cli.Client().Done():
+		// Client must be closed due to response timeout.
+	}
+	expectRetryStats(t, RetryStats{
+		QueuedRetries: 1,
+		TotalTasks:    1,
+	}, cli.Stats())
+
+	cli.SetClient(ctx, baseCliRemovePacket(ctx, t, func([]byte) bool {
+		return true
+	}))
+	cli.Retry(ctx)
+	if _, err := cli.Connect(ctx, "RetryClientTimeout"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	expectRetryStats(t, RetryStats{
+		TotalRetries: 1,
+		TotalTasks:   2,
+	}, cli.Stats())
+
+	if err := cli.Disconnect(ctx); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+}
+
+func TestIntegration_RetryClient_DirectlyPublishQoS0(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cli := &RetryClient{
+		DirectlyPublishQoS0: true,
+	}
+
+	publishQoS0Msg := make(chan struct{})
+	cli.SetClient(ctx, baseCliRemovePacket(ctx, t, func(b []byte) bool {
+		if b[0] == byte(packetPublish) {
+			close(publishQoS0Msg)
+		}
+		return b[0] != byte(packetPublish)|byte(publishFlagQoS1)
+	}))
+
+	if _, err := cli.Connect(ctx, "RetryClientDirectlyPublishQoS0"); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	if err := cli.Publish(ctx, &Message{
+		Topic:   "test/DirectlyPublishQoS0",
+		QoS:     QoS1,
+		Payload: []byte("message"),
+	}); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	expectRetryStats(t, RetryStats{
+		TotalRetries: 0,
+		TotalTasks:   1,
+	}, cli.Stats())
+
+	if err := cli.Publish(ctx, &Message{
+		Topic:   "test/DirectlyPublishQoS0",
+		QoS:     QoS0,
+		Payload: []byte("message"),
+	}); err != nil {
+		t.Fatalf("Unexpected error: '%v'", err)
+	}
+
+	select {
+	case <-publishQoS0Msg:
+	case <-time.After(150 * time.Millisecond):
+		t.Fatal("Timeout")
+	}
+	expectRetryStats(t, RetryStats{
+		TotalRetries: 0,
+		TotalTasks:   1,
+	}, cli.Stats())
 }
