@@ -87,8 +87,8 @@ func TestDial_ContextCancel(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := DialContext(
 				ctx, url,
-			); !strings.Contains(err.Error(), "dial tcp: operation was canceled") {
-				t.Errorf("Expected error: '%v', got: '%v'", context.DeadlineExceeded, err)
+			); !strings.Contains(err.Error(), "operation was canceled") {
+				t.Errorf("Expected error: 'operation was canceled', got: '%v'", err)
 			}
 		})
 	}
