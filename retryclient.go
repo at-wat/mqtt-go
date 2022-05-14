@@ -439,7 +439,7 @@ func (c *RetryClient) Retry(ctx context.Context) {
 	})
 }
 
-// Stat returns retry stats.
+// Stats returns retry stats.
 func (c *RetryClient) Stats() RetryStats {
 	c.muStats.RLock()
 	stats := c.stats
