@@ -19,6 +19,7 @@ jobs:
           - '1.16'
           - '1.17'
           - '1.18'
+          - '1.19'
         env:
           - PAHO_VERSION=v1.2.0
           - PAHO_VERSION=v1.3.2
