@@ -43,6 +43,9 @@ func expectRetryStats(t *testing.T, expected, actual RetryStats) {
 	if expected.TotalRetries != actual.TotalRetries {
 		t.Errorf("Expected total retries: %d, actual: %d", expected.TotalRetries, actual.TotalRetries)
 	}
+	if expected.CountSetClients != actual.CountSetClients {
+		t.Errorf("Expected count of SetClient: %d, actual: %d", expected.CountSetClients, actual.CountSetClients)
+	}
 }
 
 func TestIntegration_RetryClient(t *testing.T) {
@@ -73,7 +76,8 @@ func TestIntegration_RetryClient(t *testing.T) {
 
 			time.Sleep(50 * time.Millisecond)
 			expectRetryStats(t, RetryStats{
-				TotalTasks: 1,
+				TotalTasks:      1,
+				CountSetClients: 1,
 			}, cli.Stats())
 
 			if err := cli.Disconnect(ctx); err != nil {
@@ -238,7 +242,8 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 
 						if pubAt == pubBeforeSetClient || pubAt == pubBeforeConnect {
 							expectRetryStats(t, RetryStats{
-								QueuedTasks: 100,
+								QueuedTasks:     100,
+								CountSetClients: 2,
 							}, cli.Stats())
 						}
 					}
@@ -258,7 +263,8 @@ func TestIntegration_RetryClient_TaskQueue(t *testing.T) {
 					}
 
 					expectRetryStats(t, RetryStats{
-						TotalTasks: 100,
+						TotalTasks:      100,
+						CountSetClients: 2,
 					}, cli.Stats())
 
 					if err := cli.Disconnect(ctx); err != nil {
@@ -321,8 +327,9 @@ func TestIntegration_RetryClient_RetryInitialRequest(t *testing.T) {
 					// Mosquitto WebSocket sometimes requires extra time to connect
 					// and retry number may be increased.
 					expectRetryStats(t, RetryStats{
-						TotalTasks:    1, // first try to subscribe (failed)
-						QueuedRetries: 1,
+						TotalTasks:      1, // first try to subscribe (failed)
+						QueuedRetries:   1,
+						CountSetClients: 3,
 					}, cli.Stats())
 				}
 
@@ -421,8 +428,9 @@ func TestIntegration_RetryClient_ResponseTimeout(t *testing.T) {
 		// Client must be closed due to response timeout.
 	}
 	expectRetryStats(t, RetryStats{
-		QueuedRetries: 1,
-		TotalTasks:    1,
+		QueuedRetries:   1,
+		TotalTasks:      1,
+		CountSetClients: 1,
 	}, cli.Stats())
 
 	cli.SetClient(ctx, baseCliRemovePacket(ctx, t, func([]byte) bool {
@@ -435,8 +443,9 @@ func TestIntegration_RetryClient_ResponseTimeout(t *testing.T) {
 
 	time.Sleep(150 * time.Millisecond)
 	expectRetryStats(t, RetryStats{
-		TotalRetries: 1,
-		TotalTasks:   2,
+		TotalRetries:    1,
+		TotalTasks:      2,
+		CountSetClients: 2,
 	}, cli.Stats())
 
 	if err := cli.Disconnect(ctx); err != nil {
@@ -474,8 +483,9 @@ func TestIntegration_RetryClient_DirectlyPublishQoS0(t *testing.T) {
 
 	time.Sleep(150 * time.Millisecond)
 	expectRetryStats(t, RetryStats{
-		TotalRetries: 0,
-		TotalTasks:   1,
+		TotalRetries:    0,
+		TotalTasks:      1,
+		CountSetClients: 1,
 	}, cli.Stats())
 
 	if err := cli.Publish(ctx, &Message{
@@ -492,7 +502,8 @@ func TestIntegration_RetryClient_DirectlyPublishQoS0(t *testing.T) {
 		t.Fatal("Timeout")
 	}
 	expectRetryStats(t, RetryStats{
-		TotalRetries: 0,
-		TotalTasks:   1,
+		TotalRetries:    0,
+		TotalTasks:      1,
+		CountSetClients: 1,
 	}, cli.Stats())
 }
