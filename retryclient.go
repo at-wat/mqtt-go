@@ -81,7 +81,7 @@ type RetryStats struct {
 	// Total number of retries.
 	TotalRetries int
 	// Count of SetClient.
-	CountSetClients int
+	CountSetClient int
 }
 
 // Handle registers the message handler.
@@ -279,7 +279,7 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	c.chConnSwitch = make(chan struct{})
 	c.mu.Unlock()
 	c.muStats.Lock()
-	c.stats.CountSetClients++
+	c.stats.CountSetClient++
 	c.muStats.Unlock()
 
 	if c.chTask != nil {
