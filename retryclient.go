@@ -80,6 +80,12 @@ type RetryStats struct {
 	TotalTasks int
 	// Total number of retries.
 	TotalRetries int
+	// Count of SetClient.
+	CountSetClient int
+	// Count of Connect.
+	CountConnect int
+	// Count of error on Connect.
+	CountConnectError int
 }
 
 // Handle registers the message handler.
@@ -276,6 +282,9 @@ func (c *RetryClient) SetClient(ctx context.Context, cli *BaseClient) {
 	}
 	c.chConnSwitch = make(chan struct{})
 	c.mu.Unlock()
+	c.muStats.Lock()
+	c.stats.CountSetClient++
+	c.muStats.Unlock()
 
 	if c.chTask != nil {
 		return
@@ -395,8 +404,15 @@ func (c *RetryClient) Connect(ctx context.Context, clientID string, opts ...Conn
 	chConnectErr := c.chConnectErr
 	c.mu.Unlock()
 
+	c.muStats.Lock()
+	c.stats.CountConnect++
+	c.muStats.Unlock()
+
 	present, err := cli.Connect(ctx, clientID, opts...)
 	if err != nil {
+		c.muStats.Lock()
+		c.stats.CountConnectError++
+		c.muStats.Unlock()
 		chConnectErr <- err
 	}
 	close(chConnectErr)
