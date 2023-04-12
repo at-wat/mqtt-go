@@ -62,9 +62,7 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (ReconnectClient
 // The function returns after establishing a first connection, which can be canceled by the context.
 // Once after establishing the connection, the retry loop is not affected by the context.
 func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...ConnectOption) (bool, error) {
-	connOptions := &ConnectOptions{
-		CleanSession: true,
-	}
+	connOptions := &ConnectOptions{}
 	for _, opt := range opts {
 		if err := opt(connOptions); err != nil {
 			return false, err
@@ -79,20 +77,15 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 
 	var errDial, errConnect firstError
 
-	done := make(chan struct{})
+	done := make(chan bool)
 	var doneOnce sync.Once
-	var sessionPresent bool
 	go func(ctx context.Context) {
 		defer func() {
 			close(c.done)
 		}()
-		clean := connOptions.CleanSession
 		reconnWait := c.options.ReconnectWaitBase
 		for {
 			if baseCli, err := c.dialer.DialContext(ctx); err == nil {
-				optsCurr := append([]ConnectOption{}, opts...)
-				optsCurr = append(optsCurr, WithCleanSession(clean))
-				clean = false // Clean only first time.
 				c.RetryClient.SetClient(ctx, baseCli)
 
 				var ctxTimeout context.Context
@@ -103,12 +96,13 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					ctxTimeout, cancel = context.WithTimeout(ctx, c.options.Timeout)
 				}
 
-				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, optsCurr...); err == nil {
+				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, opts...); err == nil {
 					cancel()
 
 					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
 					doneOnce.Do(func() {
 						ctx = context.Background()
+						done <- sessionPresent
 						close(done)
 					})
 
@@ -167,7 +161,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 		}
 	}(ctx)
 	select {
-	case <-done:
+	case sessionPresent := <-done:
+		return sessionPresent, nil
 	case <-ctx.Done():
 		var actualErrs []string
 		if err := errDial.Load(); err != nil {
@@ -182,7 +177,6 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 		}
 		return false, wrapErrorf(ctx.Err(), "establishing first connection%s", errStr)
 	}
-	return sessionPresent, nil
 }
 
 // Disconnect from the broker.
