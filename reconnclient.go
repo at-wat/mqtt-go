@@ -106,7 +106,6 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					})
 
 					if !sessionPresent || c.options.AlwaysResubscribe {
-						println("resubscribe", sessionPresent, c.options.AlwaysResubscribe)
 						c.RetryClient.Resubscribe(ctx)
 					}
 					c.RetryClient.Retry(ctx)
