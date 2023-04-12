@@ -136,6 +136,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	c.sig.chConnAck = chConnAck
 	c.mu.Unlock()
 
+	println(o.CleanSession, clientID)
 	pkt := (&pktConnect{
 		ProtocolLevel: o.ProtocolLevel,
 		CleanSession:  o.CleanSession,

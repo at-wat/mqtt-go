@@ -42,6 +42,7 @@ func NewReconnectClient(dialer Dialer, opts ...ReconnectOption) (ReconnectClient
 		ReconnectWaitBase: time.Second,
 		ReconnectWaitMax:  10 * time.Second,
 		RetryClient:       &RetryClient{},
+		AlwaysResubscribe: true,
 	}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -111,7 +112,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 						close(done)
 					})
 
-					if !sessionPresent {
+					if !sessionPresent || c.options.AlwaysResubscribe {
+						println("resubscribe", sessionPresent, c.options.AlwaysResubscribe)
 						c.RetryClient.Resubscribe(ctx)
 					}
 					c.RetryClient.Retry(ctx)
@@ -203,6 +205,7 @@ type ReconnectOptions struct {
 	ReconnectWaitMax  time.Duration
 	PingInterval      time.Duration
 	RetryClient       *RetryClient
+	AlwaysResubscribe bool
 }
 
 // ReconnectOption sets option for Connect.
@@ -240,6 +243,15 @@ func WithPingInterval(interval time.Duration) ReconnectOption {
 func WithRetryClient(cli *RetryClient) ReconnectOption {
 	return func(o *ReconnectOptions) error {
 		o.RetryClient = cli
+		return nil
+	}
+}
+
+// WithAlwaysResubscribe enables or disables re-subscription on reconnect.
+// Default value is true.
+func WithAlwaysResubscribe(always bool) ReconnectOption {
+	return func(o *ReconnectOptions) error {
+		o.AlwaysResubscribe = always
 		return nil
 	}
 }

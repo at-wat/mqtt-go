@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -92,7 +93,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 	}
 }
 
-func newCloseFilter(key byte, en bool) func([]byte) bool {
+func newFilterBase(cbMsg func([]byte) bool) func([]byte) bool {
 	var readBuf []byte
 	return func(b []byte) (ret bool) {
 		readBuf = append(readBuf, b...)
@@ -100,9 +101,6 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 		for {
 			if len(readBuf) == 0 {
 				return
-			}
-			if readBuf[0]&0xF0 == key {
-				ret = en
 			}
 			var length int
 			for i := 1; i < 5; i++ {
@@ -118,9 +116,19 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 			if length >= len(readBuf) {
 				return
 			}
+			if cbMsg(readBuf[:length]) {
+				ret = true
+				return
+			}
 			readBuf = readBuf[length:]
 		}
 	}
+}
+
+func newCloseFilter(key byte, en bool) func([]byte) bool {
+	return newFilterBase(func(msg []byte) bool {
+		return en && msg[0]&0xF0 == key
+	})
 }
 
 func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
@@ -220,11 +228,145 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 							}
 							cli.Disconnect(ctx)
 
-							cnt := atomic.LoadInt32(&dialCnt)
-							if cnt < 2 {
-								t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
+								t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
 							}
 						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestIntegration_ReconnectClient_AlwaysResubscribe(t *testing.T) {
+	for name, url := range urls {
+		url := url
+		t.Run(name, func(t *testing.T) {
+			for resubName, alwaysResub := range map[string]bool{
+				"Always":       true,
+				"IfNotPresent": false,
+			} {
+				alwaysResub := alwaysResub
+				resubName := resubName
+				t.Run(resubName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					var subCnt int32
+					var dialCnt int32
+					var actualConn io.ReadWriteCloser
+
+					cli, err := NewReconnectClient(
+						DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+							cli, err := DialContext(ctx, url,
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							)
+							if err != nil {
+								return nil, err
+							}
+							t.Log("Dial", resubName)
+							atomic.AddInt32(&dialCnt, 1)
+							ca, cb := filteredpipe.DetectAndClosePipe(
+								newFilterBase(func(msg []byte) bool {
+									t.Logf("msg<-: %x", msg)
+									return false
+								}),
+								newFilterBase(func(msg []byte) bool {
+									t.Logf("msg->: %x", msg)
+									if msg[0]&0xF0 == 0x80 {
+										atomic.AddInt32(&subCnt, 1)
+									}
+									return false
+								}),
+							)
+							filteredpipe.Connect(ca, cli.Transport)
+							actualConn = cli.Transport
+							cli.Transport = cb
+							return cli, nil
+						}),
+						WithPingInterval(250*time.Millisecond),
+						WithTimeout(250*time.Millisecond),
+						WithReconnectWait(200*time.Millisecond, time.Second),
+						WithAlwaysResubscribe(alwaysResub),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					chReceived := make(chan *Message, 100)
+					cli.Handle(HandlerFunc(func(msg *Message) {
+						chReceived <- msg
+					}))
+					_, err = cli.Connect(
+						ctx,
+						"ReconnectClientResub"+name,
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					topic := "test_resub/" + name
+					if _, err := cli.Subscribe(ctx, Subscription{
+						Topic: topic,
+						QoS:   QoS2,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if err := cli.Publish(ctx, &Message{
+						Topic:  topic,
+						QoS:    QoS2,
+						Retain: true,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 1 {
+							break
+						}
+					}
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
+
+					actualConn.Close()
+
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+							break
+						}
+					}
+
+					if err := cli.Publish(ctx, &Message{
+						Topic:  topic,
+						QoS:    QoS2,
+						Retain: true,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
+
+					cli.Disconnect(ctx)
+
+					if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
+						t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
+					}
+					if alwaysResub {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 2 {
+							t.Errorf("Must be subscribed twice, subscribed %d times", cnt)
+						}
+					} else {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 1 {
+							t.Errorf("Must be subscribed once, subscribed %d times", cnt)
+						}
 					}
 				})
 			}
