@@ -2,7 +2,6 @@ version: '2'
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0.15
-    command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf", "-v"]
     ports:
       - 1883:1883
       - 8883:8883
