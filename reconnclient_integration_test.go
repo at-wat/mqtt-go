@@ -294,7 +294,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					}))
 					_, err = cli.Connect(
 						ctx,
-						fmt.Sprintf("ReconnectClientSession%s-%d", name, time.Now().UnixMicro()),
+						fmt.Sprintf("ReconnectClientSession%s-%d", name, time.Now().UnixNano()),
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
