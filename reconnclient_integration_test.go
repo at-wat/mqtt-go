@@ -243,111 +243,127 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 	for name, url := range urls {
 		url := url
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			var subCnt int32
-			var dialCnt int32
-			var actualConn io.ReadWriteCloser
+			for resubName, alwaysResub := range map[string]bool{
+				"Always":       true,
+				"IfNotPresent": false,
+			} {
+				alwaysResub := alwaysResub
+				resubName := resubName
+				t.Run(resubName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					var subCnt int32
+					var dialCnt int32
+					var actualConn io.ReadWriteCloser
 
-			cli, err := NewReconnectClient(
-				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
-					cli, err := DialContext(ctx, url,
-						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+					cli, err := NewReconnectClient(
+						DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+							cli, err := DialContext(ctx, url,
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							)
+							if err != nil {
+								return nil, err
+							}
+							atomic.AddInt32(&dialCnt, 1)
+							ca, cb := filteredpipe.DetectAndClosePipe(
+								newFilterBase(func([]byte) bool { return false }),
+								newFilterBase(func(msg []byte) bool {
+									if msg[0]&0xF0 == 0x80 {
+										atomic.AddInt32(&subCnt, 1)
+									}
+									return false
+								}),
+							)
+							filteredpipe.Connect(ca, cli.Transport)
+							actualConn = cli.Transport
+							cli.Transport = cb
+							return cli, nil
+						}),
+						WithPingInterval(250*time.Millisecond),
+						WithTimeout(250*time.Millisecond),
+						WithReconnectWait(200*time.Millisecond, time.Second),
+						WithAlwaysResubscribe(alwaysResub),
 					)
 					if err != nil {
-						return nil, err
+						t.Fatalf("Unexpected error: '%v'", err)
 					}
-					atomic.AddInt32(&dialCnt, 1)
-					ca, cb := filteredpipe.DetectAndClosePipe(
-						newFilterBase(func([]byte) bool { return false }),
-						newFilterBase(func(msg []byte) bool {
-							if msg[0]&0xF0 == 0x80 {
-								atomic.AddInt32(&subCnt, 1)
-							}
-							return false
-						}),
+
+					chReceived := make(chan *Message, 100)
+					cli.Handle(HandlerFunc(func(msg *Message) {
+						chReceived <- msg
+					}))
+					_, err = cli.Connect(
+						ctx,
+						fmt.Sprintf("ReconnectClientSession%s-%d", name, time.Now().UnixMicro()),
 					)
-					filteredpipe.Connect(ca, cli.Transport)
-					actualConn = cli.Transport
-					cli.Transport = cb
-					return cli, nil
-				}),
-				WithPingInterval(250*time.Millisecond),
-				WithTimeout(250*time.Millisecond),
-				WithReconnectWait(200*time.Millisecond, time.Second),
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			chReceived := make(chan *Message, 100)
-			cli.Handle(HandlerFunc(func(msg *Message) {
-				chReceived <- msg
-			}))
-			_, err = cli.Connect(
-				ctx,
-				fmt.Sprintf("ReconnectClientSession%s-%d", name, time.Now().UnixMicro()),
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					topic := "test_session/" + name
+					if _, err := cli.Subscribe(ctx, Subscription{
+						Topic: topic,
+						QoS:   QoS2,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if err := cli.Publish(ctx, &Message{
+						Topic:  topic,
+						QoS:    QoS2,
+						Retain: true,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
 
-			topic := "test_session/" + name
-			if _, err := cli.Subscribe(ctx, Subscription{
-				Topic: topic,
-				QoS:   QoS2,
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			if err := cli.Publish(ctx, &Message{
-				Topic:  topic,
-				QoS:    QoS2,
-				Retain: true,
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 1 {
+							break
+						}
+					}
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
 
-			for {
-				time.Sleep(50 * time.Millisecond)
-				if cnt := atomic.LoadInt32(&dialCnt); cnt >= 1 {
-					break
-				}
-			}
-			select {
-			case <-chReceived:
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			}
+					actualConn.Close()
 
-			actualConn.Close()
+					for {
+						time.Sleep(50 * time.Millisecond)
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+							break
+						}
+					}
 
-			for {
-				time.Sleep(50 * time.Millisecond)
-				if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
-					break
-				}
-			}
+					if err := cli.Publish(ctx, &Message{
+						Topic:  topic,
+						QoS:    QoS2,
+						Retain: true,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
 
-			if err := cli.Publish(ctx, &Message{
-				Topic:  topic,
-				QoS:    QoS2,
-				Retain: true,
-			}); err != nil {
-				t.Fatalf("Unexpected error: '%v'", err)
-			}
-			select {
-			case <-chReceived:
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			}
+					cli.Disconnect(ctx)
 
-			cli.Disconnect(ctx)
-
-			if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
-				t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
-			}
-			if cnt := atomic.LoadInt32(&subCnt); cnt != 2 {
-				t.Errorf("Must be subscribed twice, subscribed %d times", cnt)
+					if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
+						t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
+					}
+					if alwaysResub {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 2 {
+							t.Errorf("Must be subscribed twice, subscribed %d times", cnt)
+						}
+					} else {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 1 {
+							t.Errorf("Must be subscribed once, subscribed %d times", cnt)
+						}
+					}
+				})
 			}
 		})
 	}
