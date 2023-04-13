@@ -813,6 +813,8 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 
+					topic := fmt.Sprintf("test_%d_%s", qos, name)
+
 					cliRaw, err := DialContext(
 						ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
@@ -824,6 +826,16 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						"ReconnectClient2Raw"+name+qosStr,
 						WithCleanSession(true),
 					); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					var mu sync.Mutex
+					received := make(map[byte]int)
+					cliRaw.Handle(HandlerFunc(func(msg *Message) {
+						mu.Lock()
+						defer mu.Unlock()
+						received[msg.Payload[0]]++
+					}))
+					if _, err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
@@ -848,19 +860,6 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						WithCleanSession(true),
 					)
 					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-
-					topic := fmt.Sprintf("test_%d_%s", qos, name)
-
-					var mu sync.Mutex
-					received := make(map[byte]int)
-					cliRaw.Handle(HandlerFunc(func(msg *Message) {
-						mu.Lock()
-						defer mu.Unlock()
-						received[msg.Payload[0]]++
-					}))
-					if _, err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
@@ -892,7 +891,26 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 					}
 
-					time.Sleep(500 * time.Millisecond)
+					tick := time.NewTicker(50 * time.Millisecond)
+					timeoutCnt := 10
+					for {
+						<-tick.C
+						timeoutCnt--
+						if timeoutCnt <= 0 {
+							break
+						}
+						mu.Lock()
+						var i int
+						for i = 0; i < testCount; i++ {
+							if received[byte(i)] < 1 {
+								break
+							}
+						}
+						mu.Unlock()
+						if i == testCount {
+							break
+						}
+					}
 
 					mu.Lock()
 					defer mu.Unlock()
