@@ -370,7 +370,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 
 					for {
 						s := cli.Stats()
-						if s.QueuedTasks == 0 && s.TotalRetries == 0 {
+						if s.QueuedTasks == 0 && s.QueuedRetries == 0 {
 							break
 						}
 						select {
