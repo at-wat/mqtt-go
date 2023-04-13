@@ -87,16 +87,16 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 			if baseCli, err := c.dialer.DialContext(ctx); err == nil {
 				c.RetryClient.SetClient(ctx, baseCli)
 
-				var ctxTimeout context.Context
-				var cancel func()
+				var ctxConnect context.Context
+				var cancelConnect func()
 				if c.options.Timeout == 0 {
-					ctxTimeout, cancel = ctx, func() {}
+					ctxConnect, cancelConnect = ctx, func() {}
 				} else {
-					ctxTimeout, cancel = context.WithTimeout(ctx, c.options.Timeout)
+					ctxConnect, cancelConnect = context.WithTimeout(ctx, c.options.Timeout)
 				}
 
-				if sessionPresent, err := c.RetryClient.Connect(ctxTimeout, clientID, opts...); err == nil {
-					cancel()
+				if sessionPresent, err := c.RetryClient.Connect(ctxConnect, clientID, opts...); err == nil {
+					cancelConnect()
 
 					reconnWait = c.options.ReconnectWaitBase // Reset reconnect wait.
 					doneOnce.Do(func() {
@@ -110,11 +110,12 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					}
 					c.RetryClient.Retry(ctx)
 
+					ctxKeepAlive, cancelKeepAlive := context.WithCancel(ctx)
 					if c.options.PingInterval > time.Duration(0) {
 						// Start keep alive.
 						go func() {
 							if err := KeepAlive(
-								ctx, baseCli,
+								ctxKeepAlive, baseCli,
 								c.options.PingInterval,
 								c.options.Timeout,
 							); err != nil {
@@ -127,20 +128,23 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					}
 					select {
 					case <-baseCli.Done():
+						cancelKeepAlive()
 						if err := baseCli.Err(); err == nil {
 							// Disconnected as expected; don't restart.
 							return
 						}
 					case <-ctx.Done():
+						cancelKeepAlive()
 						// User cancelled; don't restart.
 						return
 					case <-c.disconnected:
+						cancelKeepAlive()
 						return
 					}
-				} else if err != ctxTimeout.Err() {
+				} else if err != ctxConnect.Err() {
 					errConnect.Store(err) // Hold first connect error excepting context cancel.
 				}
-				cancel()
+				cancelConnect()
 			} else if err != ctx.Err() {
 				errDial.Store(err) // Hold first dial error excepting context cancel.
 			}
