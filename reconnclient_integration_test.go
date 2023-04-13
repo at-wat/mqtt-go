@@ -356,14 +356,14 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					}
 
 					for {
-						select {
-						case <-time.After(50 * time.Millisecond):
-						case <-ctx.Done():
-							t.Fatal("Timeout")
-						}
 						s := cli.Stats()
 						if s.QueuedTasks == 0 && s.TotalRetries == 0 {
 							break
+						}
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-ctx.Done():
+							t.Fatalf("Timeout: stats: %+v", s)
 						}
 					}
 
