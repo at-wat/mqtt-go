@@ -315,7 +315,11 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					}
 
 					for {
-						time.Sleep(50 * time.Millisecond)
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-ctx.Done():
+							t.Fatal("Timeout")
+						}
 						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 1 {
 							break
 						}
@@ -329,7 +333,11 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					actualConn.Load().(io.ReadWriteCloser).Close()
 
 					for {
-						time.Sleep(50 * time.Millisecond)
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-ctx.Done():
+							t.Fatal("Timeout")
+						}
 						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
 							break
 						}
