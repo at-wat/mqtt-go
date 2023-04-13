@@ -371,17 +371,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						t.Fatal("Timeout")
 					}
 
-					done := make(chan struct{})
-					if err := cli.(*reconnectClient).RetryClient.pushTask(
-						ctx, func(ctx context.Context, cli *BaseClient) { close(done) },
-					); err != nil {
-						t.Fatal(err)
-					}
-					select {
-					case <-done:
-					case <-ctx.Done():
-						t.Fatal("Timeout")
-					}
+					time.Sleep(100 * time.Millisecond)
 
 					cli.Disconnect(ctx)
 
