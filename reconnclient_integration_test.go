@@ -95,11 +95,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 
 func newFilterBase(cbMsg func([]byte) bool) func([]byte) bool {
 	var readBuf []byte
-	var mu sync.Mutex
 	return func(b []byte) (ret bool) {
-		mu.Lock()
-		defer mu.Unlock()
-
 		readBuf = append(readBuf, b...)
 		ret = false
 		for {
@@ -270,12 +266,8 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 							}
 							atomic.AddInt32(&dialCnt, 1)
 							ca, cb := filteredpipe.DetectAndClosePipe(
+								newFilterBase(func([]byte) bool { return false }),
 								newFilterBase(func(msg []byte) bool {
-									println(fmt.Sprintf("msg<- %x", msg))
-									return false
-								}),
-								newFilterBase(func(msg []byte) bool {
-									println(fmt.Sprintf("msg-> %x", msg))
 									if msg[0]&0xF0 == 0x80 {
 										atomic.AddInt32(&subCnt, 1)
 									}
@@ -300,7 +292,6 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 
 					chReceived := make(chan *Message, 100)
 					cli.Handle(HandlerFunc(func(msg *Message) {
-						t.Logf("message: %v", msg)
 						chReceived <- msg
 					}))
 					_, err = cli.Connect(
@@ -337,8 +328,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						}
 					}
 					select {
-					case msg := <-chReceived:
-						t.Logf("received: %v", msg)
+					case <-chReceived:
 					case <-ctx.Done():
 						t.Fatal("Timeout")
 					}
@@ -365,8 +355,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					}
 
 					select {
-					case msg := <-chReceived:
-						t.Logf("received: %v", msg)
+					case <-chReceived:
 					case <-ctx.Done():
 						t.Fatal("Timeout")
 					}
