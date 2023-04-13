@@ -241,6 +241,8 @@ func WithRetryClient(cli *RetryClient) ReconnectOption {
 
 // WithAlwaysResubscribe enables or disables re-subscribe on reconnect.
 // Default value is false.
+// This option can be used to ensure all subscriptions are restored
+// even if the server is buggy.
 func WithAlwaysResubscribe(always bool) ReconnectOption {
 	return func(o *ReconnectOptions) error {
 		o.AlwaysResubscribe = always
