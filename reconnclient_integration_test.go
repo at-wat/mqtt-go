@@ -117,7 +117,7 @@ func newFilterBase(cbMsg func([]byte) bool) func([]byte) bool {
 					break
 				}
 			}
-			if length >= len(readBuf) {
+			if length > len(readBuf) {
 				return
 			}
 			if cbMsg(readBuf[:length]) {
