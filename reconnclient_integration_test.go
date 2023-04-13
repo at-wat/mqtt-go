@@ -362,7 +362,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 							t.Fatal("Timeout")
 						}
 						s := cli.Stats()
-						if s.QueuedTasks == 0 {
+						if s.QueuedTasks == 0 && s.TotalRetries == 0 {
 							break
 						}
 					}
