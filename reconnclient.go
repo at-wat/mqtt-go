@@ -76,7 +76,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 
 	var errDial, errConnect firstError
 
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	var doneOnce sync.Once
 	go func(ctx context.Context) {
 		defer func() {
