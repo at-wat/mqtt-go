@@ -288,19 +288,21 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
+					id := time.Now().UnixNano()
+
 					chReceived := make(chan *Message, 100)
 					cli.Handle(HandlerFunc(func(msg *Message) {
 						chReceived <- msg
 					}))
 					_, err = cli.Connect(
 						ctx,
-						fmt.Sprintf("ReconnectClientSession%s-%d", name, time.Now().UnixNano()),
+						fmt.Sprintf("ReconnectClientSession%s-%d", name, id),
 					)
 					if err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
-					topic := "test_session/" + name
+					topic := fmt.Sprintf("test_session/%s/%d", name, id)
 					if _, err := cli.Subscribe(ctx, Subscription{
 						Topic: topic,
 						QoS:   QoS2,
@@ -369,8 +371,8 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 
 					cli.Disconnect(ctx)
 
-					if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
-						t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
+					if cnt := atomic.LoadInt32(&dialCnt); cnt != 2 {
+						t.Errorf("Must be dialed twice, dialed %d times", cnt)
 					}
 					if alwaysResub {
 						if cnt := atomic.LoadInt32(&subCnt); cnt != 2 {
