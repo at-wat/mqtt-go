@@ -344,6 +344,13 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 
 					actualConn.Load().(io.ReadWriteCloser).Close()
 
+					if err := cli.Publish(ctx, &Message{
+						Topic: topic,
+						QoS:   QoS2,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
 					for {
 						select {
 						case <-time.After(50 * time.Millisecond):
@@ -355,12 +362,6 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						}
 					}
 
-					if err := cli.Publish(ctx, &Message{
-						Topic: topic,
-						QoS:   QoS2,
-					}); err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
 					select {
 					case msg := <-chReceived:
 						t.Logf("received: %v", msg)
@@ -368,16 +369,16 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						t.Fatal("Timeout")
 					}
 
-					for {
-						s := cli.Stats()
-						if s.QueuedTasks == 0 && s.QueuedRetries == 0 {
-							break
-						}
-						select {
-						case <-time.After(50 * time.Millisecond):
-						case <-ctx.Done():
-							t.Fatalf("Timeout: stats: %+v", s)
-						}
+					done := make(chan struct{})
+					if err := cli.(*reconnectClient).RetryClient.pushTask(
+						ctx, func(ctx context.Context, cli *BaseClient) { close(done) },
+					); err != nil {
+						t.Fatal(err)
+					}
+					select {
+					case <-done:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
 					}
 
 					cli.Disconnect(ctx)
