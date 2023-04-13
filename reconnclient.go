@@ -83,6 +83,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 			close(c.done)
 		}()
 		reconnWait := c.options.ReconnectWaitBase
+		var initialized bool
 		for {
 			if baseCli, err := c.dialer.DialContext(ctx); err == nil {
 				c.RetryClient.SetClient(ctx, baseCli)
@@ -105,10 +106,11 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 						close(done)
 					})
 
-					if !sessionPresent || c.options.AlwaysResubscribe {
+					if initialized && (!sessionPresent || c.options.AlwaysResubscribe) {
 						c.RetryClient.Resubscribe(ctx)
 					}
 					c.RetryClient.Retry(ctx)
+					initialized = true
 
 					ctxKeepAlive, cancelKeepAlive := context.WithCancel(ctx)
 					if c.options.PingInterval > time.Duration(0) {
