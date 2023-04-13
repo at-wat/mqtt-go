@@ -254,7 +254,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					defer cancel()
 					var subCnt int32
 					var dialCnt int32
-					var actualConn io.ReadWriteCloser
+					var actualConn atomic.Value
 
 					cli, err := NewReconnectClient(
 						DialerFunc(func(ctx context.Context) (*BaseClient, error) {
@@ -275,7 +275,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 								}),
 							)
 							filteredpipe.Connect(ca, cli.Transport)
-							actualConn = cli.Transport
+							actualConn.Store(cli.Transport)
 							cli.Transport = cb
 							return cli, nil
 						}),
@@ -327,7 +327,7 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						t.Fatal("Timeout")
 					}
 
-					actualConn.Close()
+					actualConn.Load().(io.ReadWriteCloser).Close()
 
 					for {
 						time.Sleep(50 * time.Millisecond)
