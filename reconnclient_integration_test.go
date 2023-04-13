@@ -308,9 +308,8 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 					if err := cli.Publish(ctx, &Message{
-						Topic:  topic,
-						QoS:    QoS2,
-						Retain: true,
+						Topic: topic,
+						QoS:   QoS2,
 					}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
@@ -337,9 +336,8 @@ func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
 					}
 
 					if err := cli.Publish(ctx, &Message{
-						Topic:  topic,
-						QoS:    QoS2,
-						Retain: true,
+						Topic: topic,
+						QoS:   QoS2,
 					}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
