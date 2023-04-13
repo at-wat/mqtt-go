@@ -426,12 +426,14 @@ func (c *RetryClient) Resubscribe(ctx context.Context) {
 		oldSubEstablished := append([]Subscription{}, c.subEstablished...)
 		c.subEstablished = nil
 
+		println("exec Resubscribe")
 		if len(oldSubEstablished) > 0 {
 			for _, sub := range oldSubEstablished {
 				c.subscribe(ctx, true, cli, sub)
 			}
 		}
 	})
+	println("queued Resubscribe")
 }
 
 // Retry all queued publish/subscribe requests.
@@ -440,6 +442,7 @@ func (c *RetryClient) Retry(ctx context.Context) {
 		oldRetryQueue := append([]retryFn{}, c.retryQueue...)
 		c.retryQueue = nil
 
+		println("exec Retry")
 		for _, retry := range oldRetryQueue {
 			c.muStats.Lock()
 			c.stats.TotalRetries++
@@ -453,6 +456,7 @@ func (c *RetryClient) Retry(ctx context.Context) {
 			}
 		}
 	})
+	println("queued Retry")
 }
 
 // Stats returns retry stats.
