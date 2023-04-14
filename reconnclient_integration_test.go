@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -92,7 +93,7 @@ func TestIntegration_ReconnectClient(t *testing.T) {
 	}
 }
 
-func newCloseFilter(key byte, en bool) func([]byte) bool {
+func newFilterBase(cbMsg func([]byte) bool) func([]byte) bool {
 	var readBuf []byte
 	return func(b []byte) (ret bool) {
 		readBuf = append(readBuf, b...)
@@ -100,9 +101,6 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 		for {
 			if len(readBuf) == 0 {
 				return
-			}
-			if readBuf[0]&0xF0 == key {
-				ret = en
 			}
 			var length int
 			for i := 1; i < 5; i++ {
@@ -115,12 +113,22 @@ func newCloseFilter(key byte, en bool) func([]byte) bool {
 					break
 				}
 			}
-			if length >= len(readBuf) {
+			if length > len(readBuf) {
+				return
+			}
+			if cbMsg(readBuf[:length]) {
+				ret = true
 				return
 			}
 			readBuf = readBuf[length:]
 		}
 	}
+}
+
+func newCloseFilter(key byte, en bool) func([]byte) bool {
+	return newFilterBase(func(msg []byte) bool {
+		return en && msg[0]&0xF0 == key
+	})
 }
 
 func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
@@ -220,11 +228,157 @@ func TestIntegration_ReconnectClient_Resubscribe(t *testing.T) {
 							}
 							cli.Disconnect(ctx)
 
-							cnt := atomic.LoadInt32(&dialCnt)
-							if cnt < 2 {
-								t.Errorf("Must be dialled at least twice, dialled %d times", cnt)
+							if cnt := atomic.LoadInt32(&dialCnt); cnt < 2 {
+								t.Errorf("Must be dialed at least twice, dialed %d times", cnt)
 							}
 						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestIntegration_ReconnectClient_SessionPersistence(t *testing.T) {
+	for name, url := range urls {
+		url := url
+		t.Run(name, func(t *testing.T) {
+			for resubName, alwaysResub := range map[string]bool{
+				"Always":       true,
+				"IfNotPresent": false,
+			} {
+				alwaysResub := alwaysResub
+				resubName := resubName
+				t.Run(resubName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					var subCnt int32
+					var dialCnt int32
+					var actualConn atomic.Value
+
+					cli, err := NewReconnectClient(
+						DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+							cli, err := DialContext(ctx, url,
+								WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+							)
+							if err != nil {
+								return nil, err
+							}
+							atomic.AddInt32(&dialCnt, 1)
+							ca, cb := filteredpipe.DetectAndClosePipe(
+								newFilterBase(func([]byte) bool { return false }),
+								newFilterBase(func(msg []byte) bool {
+									if msg[0]&0xF0 == 0x80 {
+										atomic.AddInt32(&subCnt, 1)
+									}
+									return false
+								}),
+							)
+							filteredpipe.Connect(ca, cli.Transport)
+							actualConn.Store(cli.Transport)
+							cli.Transport = cb
+							return cli, nil
+						}),
+						WithPingInterval(250*time.Millisecond),
+						WithTimeout(250*time.Millisecond),
+						WithReconnectWait(200*time.Millisecond, time.Second),
+						WithAlwaysResubscribe(alwaysResub),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					id := time.Now().UnixNano()
+
+					chReceived := make(chan *Message, 100)
+					cli.Handle(HandlerFunc(func(msg *Message) {
+						chReceived <- msg
+					}))
+					_, err = cli.Connect(
+						ctx,
+						fmt.Sprintf("ReconnectClientSession%s-%d", name, id),
+					)
+					if err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					topic := fmt.Sprintf("test_session/%s/%d", name, id)
+					if _, err := cli.Subscribe(ctx, Subscription{
+						Topic: topic,
+						QoS:   QoS2,
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					if err := cli.Publish(ctx, &Message{
+						Topic:   topic,
+						QoS:     QoS2,
+						Payload: []byte{1},
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					for {
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-ctx.Done():
+							t.Fatal("Timeout")
+						}
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 1 {
+							break
+						}
+					}
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
+
+					actualConn.Load().(io.ReadWriteCloser).Close()
+
+					if err := cli.Publish(ctx, &Message{
+						Topic:   topic,
+						QoS:     QoS2,
+						Payload: []byte{2},
+					}); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+
+					for {
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-ctx.Done():
+							t.Fatal("Timeout")
+						}
+						if cnt := atomic.LoadInt32(&dialCnt); cnt >= 2 {
+							break
+						}
+					}
+
+					select {
+					case <-chReceived:
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
+
+					cli.Disconnect(ctx)
+
+					select {
+					case <-cli.Client().Done():
+					case <-ctx.Done():
+						t.Fatal("Timeout")
+					}
+
+					if cnt := atomic.LoadInt32(&dialCnt); cnt != 2 {
+						t.Errorf("Must be dialed twice, dialed %d times", cnt)
+					}
+					if alwaysResub {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 2 {
+							t.Errorf("Must be subscribed twice, subscribed %d times", cnt)
+						}
+					} else {
+						if cnt := atomic.LoadInt32(&subCnt); cnt != 1 {
+							t.Errorf("Must be subscribed once, subscribed %d times", cnt)
+						}
 					}
 				})
 			}
@@ -678,6 +832,8 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
 
+					topic := fmt.Sprintf("test_%d_%s", qos, name)
+
 					cliRaw, err := DialContext(
 						ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
@@ -689,6 +845,16 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						"ReconnectClient2Raw"+name+qosStr,
 						WithCleanSession(true),
 					); err != nil {
+						t.Fatalf("Unexpected error: '%v'", err)
+					}
+					var mu sync.Mutex
+					received := make(map[byte]int)
+					cliRaw.Handle(HandlerFunc(func(msg *Message) {
+						mu.Lock()
+						defer mu.Unlock()
+						received[msg.Payload[0]]++
+					}))
+					if _, err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
@@ -713,19 +879,6 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						WithCleanSession(true),
 					)
 					if err != nil {
-						t.Fatalf("Unexpected error: '%v'", err)
-					}
-
-					topic := fmt.Sprintf("test_%d_%s", qos, name)
-
-					var mu sync.Mutex
-					received := make(map[byte]int)
-					cliRaw.Handle(HandlerFunc(func(msg *Message) {
-						mu.Lock()
-						defer mu.Unlock()
-						received[msg.Payload[0]]++
-					}))
-					if _, err := cliRaw.Subscribe(ctx, Subscription{Topic: topic, QoS: qos}); err != nil {
 						t.Fatalf("Unexpected error: '%v'", err)
 					}
 
@@ -757,7 +910,26 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 					}
 
-					time.Sleep(500 * time.Millisecond)
+					tick := time.NewTicker(50 * time.Millisecond)
+					timeoutCnt := 10
+					for {
+						<-tick.C
+						timeoutCnt--
+						if timeoutCnt <= 0 {
+							break
+						}
+						mu.Lock()
+						var i int
+						for i = 0; i < testCount; i++ {
+							if received[byte(i)] < 1 {
+								break
+							}
+						}
+						mu.Unlock()
+						if i == testCount {
+							break
+						}
+					}
 
 					mu.Lock()
 					defer mu.Unlock()
