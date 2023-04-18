@@ -32,6 +32,7 @@ func (c *BaseClient) SetErrorOnce(err error) {
 
 func (c *BaseClient) connStateUpdate(newState ConnState) {
 	c.mu.Lock()
+	println("connStateUpdate", c.connState.String(), "to", newState.String())
 	lastState := c.connState
 	if c.connState != StateDisconnected {
 		c.connState = newState

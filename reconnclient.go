@@ -152,6 +152,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 			}
 			select {
 			case <-time.After(reconnWait):
+				println("reconnect retry")
 			case <-ctx.Done():
 				// User cancelled; don't restart.
 				return

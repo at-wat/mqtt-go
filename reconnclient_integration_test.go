@@ -960,30 +960,36 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			chState := make(chan ConnState, 1)
+			chState := make(chan ConnState, 100)
 			var dialCnt int32
 
 			cli, err := NewReconnectClient(
 				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+					println("dial")
 					cli, err := DialContext(ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 						WithConnStateHandler(func(state ConnState, err error) {
+							println("state", state.String())
 							chState <- state
 						}),
 					)
 					if err != nil {
 						return nil, err
 					}
-					atomic.AddInt32(&dialCnt, 1)
+					cnt := atomic.AddInt32(&dialCnt, 1)
 					ca, cb := filteredpipe.DetectAndClosePipe(
-						newFilterBase(func([]byte) bool { return false }),
 						newFilterBase(func(msg []byte) bool {
-							cnt := atomic.LoadInt32(&dialCnt)
-							if cnt == 1 && msg[0]&0xf0 == 0x30 {
+							if cnt == 2 && msg[0]&0xf0 == 0x20 {
+								println("test: force close 2")
+								time.Sleep(150 * time.Millisecond)
+								println("test: force close 2 do")
 								return true
 							}
-							if cnt == 2 && msg[0]&0xf0 == 0x30 {
-								time.Sleep(200 * time.Millisecond)
+							return false
+						}),
+						newFilterBase(func(msg []byte) bool {
+							if cnt == 1 && msg[0]&0xf0 == 0x30 {
+								println("test: force close")
 								return true
 							}
 							return false
@@ -992,6 +998,9 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 					filteredpipe.Connect(ca, cli.Transport)
 					cli.Transport = cb
 					return cli, nil
+				}),
+				WithRetryClient(&RetryClient{
+					ResponseTimeout: 100 * time.Millisecond,
 				}),
 				WithPingInterval(time.Second),
 				WithTimeout(100*time.Millisecond),
@@ -1043,8 +1052,10 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				}
 			}
 
+			t.Log("Watching extra state change")
 			select {
-			case <-time.After(300 * time.Millisecond):
+			case <-time.After(500 * time.Millisecond):
+				t.Log("no state change")
 			case s := <-chState:
 				t.Errorf("Unexpected state change to %s", s)
 			}
