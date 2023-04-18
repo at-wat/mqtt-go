@@ -952,3 +952,105 @@ func TestIntegration_ReconnectClient_RepeatedDisconnect(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
+	for name, url := range urls {
+		url := url
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			chState := make(chan ConnState, 1)
+			var dialCnt int32
+
+			cli, err := NewReconnectClient(
+				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
+					cli, err := DialContext(ctx, url,
+						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+						WithConnStateHandler(func(state ConnState, err error) {
+							chState <- state
+						}),
+					)
+					if err != nil {
+						return nil, err
+					}
+					atomic.AddInt32(&dialCnt, 1)
+					ca, cb := filteredpipe.DetectAndClosePipe(
+						newFilterBase(func([]byte) bool { return false }),
+						newFilterBase(func(msg []byte) bool {
+							cnt := atomic.LoadInt32(&dialCnt)
+							if cnt == 1 && msg[0]&0xf0 == 0x30 {
+								return true
+							}
+							if cnt == 2 && msg[0]&0xf0 == 0x10 {
+								time.Sleep(200 * time.Millisecond)
+							}
+							return false
+						}),
+					)
+					filteredpipe.Connect(ca, cli.Transport)
+					cli.Transport = cb
+					return cli, nil
+				}),
+				WithPingInterval(time.Second),
+				WithTimeout(100*time.Millisecond),
+				WithReconnectWait(100*time.Millisecond, 500*time.Millisecond),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+			_, err = cli.Connect(
+				ctx,
+				"ReconnectClientErrDuringReconnect"+name,
+				WithKeepAlive(10),
+				WithCleanSession(true),
+			)
+			if err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if err := cli.Publish(ctx, &Message{
+				Topic:   "error_during_reconnect",
+				QoS:     QoS0,
+				Payload: []byte{},
+			}); err != nil {
+				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			select {
+			case <-ctx.Done():
+				t.Fatal("Timeout")
+			case s := <-chState:
+				if s != StateActive {
+					t.Errorf("Expected %s, got %s", StateActive, s)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				t.Fatal("Timeout")
+			case s := <-chState:
+				if s != StateClosed {
+					t.Errorf("Expected %s, got %s", StateClosed, s)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				t.Fatal("Timeout")
+			case s := <-chState:
+				if s != StateActive {
+					t.Errorf("Expected %s, got %s", StateActive, s)
+				}
+			}
+
+			cli.Disconnect(ctx)
+			select {
+			case <-ctx.Done():
+				t.Fatal("Timeout")
+			case s := <-chState:
+				if s != StateDisconnected {
+					t.Errorf("Expected %s, got %s", StateDisconnected, s)
+				}
+			}
+		})
+	}
+}
