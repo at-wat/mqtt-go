@@ -982,8 +982,9 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 							if cnt == 1 && msg[0]&0xf0 == 0x30 {
 								return true
 							}
-							if cnt == 2 && msg[0]&0xf0 == 0x10 {
+							if cnt == 2 && msg[0]&0xf0 == 0x30 {
 								time.Sleep(200 * time.Millisecond)
+								return true
 							}
 							return false
 						}),
@@ -994,7 +995,7 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				}),
 				WithPingInterval(time.Second),
 				WithTimeout(100*time.Millisecond),
-				WithReconnectWait(100*time.Millisecond, 500*time.Millisecond),
+				WithReconnectWait(10*time.Millisecond, 10*time.Millisecond),
 			)
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -1011,7 +1012,7 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 
 			if err := cli.Publish(ctx, &Message{
 				Topic:   "error_during_reconnect",
-				QoS:     QoS0,
+				QoS:     QoS1,
 				Payload: []byte{},
 			}); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
@@ -1040,6 +1041,12 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				if s != StateActive {
 					t.Errorf("Expected %s, got %s", StateActive, s)
 				}
+			}
+
+			select {
+			case <-time.After(300 * time.Millisecond):
+			case s := <-chState:
+				t.Errorf("Unexpected state change to %s", s)
 			}
 
 			cli.Disconnect(ctx)
