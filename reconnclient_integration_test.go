@@ -965,11 +965,9 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 
 			cli, err := NewReconnectClient(
 				DialerFunc(func(ctx context.Context) (*BaseClient, error) {
-					println("dial")
 					cli, err := DialContext(ctx, url,
 						WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
 						WithConnStateHandler(func(state ConnState, err error) {
-							println("state", state.String())
 							chState <- state
 						}),
 					)
@@ -980,16 +978,13 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 					ca, cb := filteredpipe.DetectAndClosePipe(
 						newFilterBase(func(msg []byte) bool {
 							if cnt == 2 && msg[0]&0xf0 == 0x20 {
-								println("test: force close 2")
 								time.Sleep(150 * time.Millisecond)
-								println("test: force close 2 do")
 								return true
 							}
 							return false
 						}),
 						newFilterBase(func(msg []byte) bool {
 							if cnt == 1 && msg[0]&0xf0 == 0x30 {
-								println("test: force close")
 								return true
 							}
 							return false
@@ -1052,17 +1047,12 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				}
 			}
 
-			time.Sleep(5 * time.Second)
-
-			t.Log("Watching extra state change")
 			select {
 			case <-time.After(500 * time.Millisecond):
-				t.Log("no state change")
 			case s := <-chState:
 				t.Errorf("Unexpected state change to %s", s)
 			}
 
-			println("disconnecting")
 			cli.Disconnect(ctx)
 			select {
 			case <-ctx.Done():

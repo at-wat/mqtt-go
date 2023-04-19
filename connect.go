@@ -118,9 +118,7 @@ func (c *BaseClient) Connect(ctx context.Context, clientID string, opts ...Conne
 	defer c.muConnecting.Unlock()
 
 	go func() {
-		println("--- start serving")
 		err := c.serve()
-		println("--- end serving")
 		if errConn := c.Close(); errConn != nil && err == nil {
 			err = errConn
 		}
