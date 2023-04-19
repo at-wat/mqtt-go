@@ -23,19 +23,22 @@ import (
 func DetectAndClosePipe(h0, h1 func([]byte) bool) (io.ReadWriteCloser, io.ReadWriteCloser) {
 	ch0 := make(chan []byte, 1000)
 	ch1 := make(chan []byte, 1000)
+	closed, fnClose := mewCloseCh()
 	return &detectAndCloseConn{
 			baseFilterConn: &baseFilterConn{
 				rCh:     ch0,
 				wCh:     ch1,
 				handler: h0,
-				closed:  make(chan struct{}),
+				closed:  closed,
+				fnClose: fnClose,
 			},
 		}, &detectAndCloseConn{
 			baseFilterConn: &baseFilterConn{
 				rCh:     ch1,
 				wCh:     ch0,
 				handler: h1,
-				closed:  make(chan struct{}),
+				closed:  closed,
+				fnClose: fnClose,
 			},
 		}
 }
@@ -46,7 +49,7 @@ type detectAndCloseConn struct {
 
 func (c *detectAndCloseConn) Write(data []byte) (n int, err error) {
 	if c.handler(data) {
-		c.closeOnce.Do(func() { close(c.closed) })
+		c.fnClose()
 		return 0, io.ErrClosedPipe
 	}
 	select {

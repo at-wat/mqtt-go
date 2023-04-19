@@ -24,12 +24,14 @@ import (
 func DetectAndDropPipe(h0, h1 func([]byte) bool) (io.ReadWriteCloser, io.ReadWriteCloser) {
 	ch0 := make(chan []byte, 1000)
 	ch1 := make(chan []byte, 1000)
+	closed, fnClose := mewCloseCh()
 	return &detectAndDropConn{
 			baseFilterConn: &baseFilterConn{
 				rCh:     ch0,
 				wCh:     ch1,
 				handler: h0,
-				closed:  make(chan struct{}),
+				closed:  closed,
+				fnClose: fnClose,
 			},
 			dropping: make(chan struct{}),
 		}, &detectAndDropConn{
@@ -37,7 +39,8 @@ func DetectAndDropPipe(h0, h1 func([]byte) bool) (io.ReadWriteCloser, io.ReadWri
 				rCh:     ch1,
 				wCh:     ch0,
 				handler: h1,
-				closed:  make(chan struct{}),
+				closed:  closed,
+				fnClose: fnClose,
 			},
 			dropping: make(chan struct{}),
 		}
