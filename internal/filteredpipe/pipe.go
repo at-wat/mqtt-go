@@ -39,7 +39,8 @@ type baseFilterConn struct {
 	rCh       chan []byte
 	wCh       chan []byte
 	handler   func([]byte) bool
-	closed    chan struct{}
+	closed    <-chan struct{}
+	fnClose   func()
 	closeOnce sync.Once
 	remain    io.Reader
 }
@@ -77,6 +78,16 @@ func (c *baseFilterConn) Read(data []byte) (n int, err error) {
 }
 
 func (c *baseFilterConn) Close() error {
-	c.closeOnce.Do(func() { close(c.closed) })
+	c.fnClose()
 	return nil
+}
+
+func mewCloseCh() (<-chan struct{}, func()) {
+	ch := make(chan struct{})
+	var once sync.Once
+	return ch, func() {
+		once.Do(func() {
+			close(ch)
+		})
+	}
 }

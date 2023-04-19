@@ -88,13 +88,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 			if baseCli, err := c.dialer.DialContext(ctx); err == nil {
 				c.RetryClient.SetClient(ctx, baseCli)
 
-				var ctxConnect context.Context
-				var cancelConnect func()
-				if c.options.Timeout == 0 {
-					ctxConnect, cancelConnect = ctx, func() {}
-				} else {
-					ctxConnect, cancelConnect = context.WithTimeout(ctx, c.options.Timeout)
-				}
+				ctxConnect, cancelConnect := c.options.timeoutContext(ctx)
 
 				if sessionPresent, err := c.RetryClient.Connect(ctxConnect, clientID, opts...); err == nil {
 					cancelConnect()
@@ -147,6 +141,11 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 					errConnect.Store(err) // Hold first connect error excepting context cancel.
 				}
 				cancelConnect()
+
+				// Close baseCli to avoid unordered state callback
+				baseCli.Close()
+				// baseCli.Done() should be returned immediately if no incoming message callback is not blocked
+				<-baseCli.Done()
 			} else if err != ctx.Err() {
 				errDial.Store(err) // Hold first dial error excepting context cancel.
 			}
@@ -204,6 +203,13 @@ type ReconnectOptions struct {
 	PingInterval      time.Duration
 	RetryClient       *RetryClient
 	AlwaysResubscribe bool
+}
+
+func (c *ReconnectOptions) timeoutContext(ctx context.Context) (context.Context, func()) {
+	if c.Timeout == 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, c.Timeout)
 }
 
 // ReconnectOption sets option for Connect.
