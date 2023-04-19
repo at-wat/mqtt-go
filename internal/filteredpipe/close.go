@@ -23,7 +23,7 @@ import (
 func DetectAndClosePipe(h0, h1 func([]byte) bool) (io.ReadWriteCloser, io.ReadWriteCloser) {
 	ch0 := make(chan []byte, 1000)
 	ch1 := make(chan []byte, 1000)
-	closed, fnClose := mewCloseCh()
+	closed, fnClose := newCloseCh()
 	return &detectAndCloseConn{
 			baseFilterConn: &baseFilterConn{
 				rCh:     ch0,
