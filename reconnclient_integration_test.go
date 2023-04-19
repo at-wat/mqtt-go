@@ -960,7 +960,7 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			chState := make(chan ConnState, 100)
+			chState := make(chan ConnState, 1)
 			var dialCnt int32
 
 			cli, err := NewReconnectClient(
@@ -1004,13 +1004,12 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
-			_, err = cli.Connect(
+			if _, err = cli.Connect(
 				ctx,
 				"ReconnectClientErrDuringReconnect"+name,
 				WithKeepAlive(10),
 				WithCleanSession(true),
-			)
-			if err != nil {
+			); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
@@ -1022,38 +1021,20 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			select {
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			case s := <-chState:
-				if s != StateActive {
-					t.Errorf("Expected %s, got %s", StateActive, s)
+			assertStateChange := func(expected ConnState) {
+				select {
+				case <-ctx.Done():
+					t.Error("Timeout")
+				case s := <-chState:
+					if s != expected {
+						t.Errorf("Expected %s, got %s", expected, s)
+					}
 				}
 			}
-			select {
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			case s := <-chState:
-				if s != StateClosed {
-					t.Errorf("Expected %s, got %s", StateClosed, s)
-				}
-			}
-			select {
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			case s := <-chState:
-				if s != StateClosed {
-					t.Errorf("Expected %s, got %s", StateClosed, s)
-				}
-			}
-			select {
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			case s := <-chState:
-				if s != StateActive {
-					t.Errorf("Expected %s, got %s", StateActive, s)
-				}
-			}
+			assertStateChange(StateActive)
+			assertStateChange(StateClosed)
+			assertStateChange(StateClosed)
+			assertStateChange(StateActive)
 
 			select {
 			case <-time.After(300 * time.Millisecond):
@@ -1062,14 +1043,7 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 			}
 
 			cli.Disconnect(ctx)
-			select {
-			case <-ctx.Done():
-				t.Fatal("Timeout")
-			case s := <-chState:
-				if s != StateDisconnected {
-					t.Errorf("Expected %s, got %s", StateDisconnected, s)
-				}
-			}
+			assertStateChange(StateDisconnected)
 		})
 	}
 }
