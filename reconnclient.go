@@ -144,12 +144,8 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 
 				// Close baseCli to avoid unordered state callback
 				baseCli.Close()
-				ctxClose, cancelClose := c.options.timeoutContext(ctx)
-				select {
-				case <-baseCli.Done():
-				case <-ctxClose.Done():
-				}
-				cancelClose()
+				// baseCli.Done() should be returned immediately if no incoming message callback is not blocked
+				<-baseCli.Done()
 			} else if err != ctx.Err() {
 				errDial.Store(err) // Hold first dial error excepting context cancel.
 			}
