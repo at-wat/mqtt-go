@@ -82,7 +82,7 @@ func (c *baseFilterConn) Close() error {
 	return nil
 }
 
-func mewCloseCh() (<-chan struct{}, func()) {
+func newCloseCh() (<-chan struct{}, func()) {
 	ch := make(chan struct{})
 	var once sync.Once
 	return ch, func() {
