@@ -1042,13 +1042,21 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("Timeout")
 			case s := <-chState:
+				if s != StateClosed {
+					t.Errorf("Expected %s, got %s", StateClosed, s)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				t.Fatal("Timeout")
+			case s := <-chState:
 				if s != StateActive {
 					t.Errorf("Expected %s, got %s", StateActive, s)
 				}
 			}
 
 			select {
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(300 * time.Millisecond):
 			case s := <-chState:
 				t.Errorf("Unexpected state change to %s", s)
 			}
