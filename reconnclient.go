@@ -146,6 +146,7 @@ func (c *reconnectClient) Connect(ctx context.Context, clientID string, opts ...
 				} else if err != ctxConnect.Err() {
 					errConnect.Store(err) // Hold first connect error excepting context cancel.
 				}
+				println("connect done")
 				cancelConnect()
 			} else if err != ctx.Err() {
 				errDial.Store(err) // Hold first dial error excepting context cancel.

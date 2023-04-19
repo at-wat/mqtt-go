@@ -31,6 +31,7 @@ func (c *BaseClient) SetErrorOnce(err error) {
 }
 
 func (c *BaseClient) connStateUpdate(newState ConnState) {
+	println("connStateUpdating", newState.String())
 	c.mu.Lock()
 	println("connStateUpdate", c.connState.String(), "to", newState.String())
 	lastState := c.connState

@@ -1052,6 +1052,8 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				}
 			}
 
+			time.Sleep(5 * time.Second)
+
 			t.Log("Watching extra state change")
 			select {
 			case <-time.After(500 * time.Millisecond):
@@ -1060,6 +1062,7 @@ func TestIntegration_ReconnectClient_WithConnStateHandler(t *testing.T) {
 				t.Errorf("Unexpected state change to %s", s)
 			}
 
+			println("disconnecting")
 			cli.Disconnect(ctx)
 			select {
 			case <-ctx.Done():
