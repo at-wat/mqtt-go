@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: push tags
         run: |
           git remote set-url origin https://${GITHUB_TOKEN}@github.com/at-wat/mqtt-go.git
