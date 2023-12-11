@@ -43,6 +43,7 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 	case <-c.connClosed:
 		return wrapError(ErrClosedTransport, "sending PINGREQ")
 	case <-ctx.Done():
+		c.storePingError()
 		return wrapError(ctx.Err(), "waiting PINGRESP")
 	case <-chPingResp:
 		tRes := time.Now()

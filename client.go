@@ -56,6 +56,7 @@ type BaseStats struct {
 	RecentPingDelay time.Duration
 	MaxPingDelay    time.Duration
 	MinPingDelay    time.Duration
+	CountPingError  int
 }
 
 func (c *BaseClient) storePingDelay(d time.Duration) {
@@ -67,6 +68,13 @@ func (c *BaseClient) storePingDelay(d time.Duration) {
 	if c.stats.MinPingDelay > d || c.stats.MinPingDelay == 0 {
 		c.stats.MinPingDelay = d
 	}
+	c.muStats.Unlock()
+}
+
+func (c *BaseClient) storePingError() {
+	c.muStats.Lock()
+	c.stats.RecentPingDelay = 0
+	c.stats.CountPingError++
 	c.muStats.Unlock()
 }
 
