@@ -53,27 +53,31 @@ type BaseClient struct {
 
 // BaseStats stores base client statistics.
 type BaseStats struct {
-	RecentPingDelay time.Duration
-	MaxPingDelay    time.Duration
-	MinPingDelay    time.Duration
-	CountPingError  int
+	// Recent ping delay.
+	PingDelayRecent time.Duration
+	// Maximum ping delay.
+	PingDelayMax time.Duration
+	// Minimum ping delay.
+	PingDelayMin time.Duration
+	// Count of ping error.
+	CountPingError int
 }
 
 func (c *BaseClient) storePingDelay(d time.Duration) {
 	c.muStats.Lock()
-	c.stats.RecentPingDelay = d
-	if c.stats.MaxPingDelay < d {
-		c.stats.MaxPingDelay = d
+	c.stats.PingDelayRecent = d
+	if c.stats.PingDelayMax < d {
+		c.stats.PingDelayMax = d
 	}
-	if c.stats.MinPingDelay > d || c.stats.MinPingDelay == 0 {
-		c.stats.MinPingDelay = d
+	if c.stats.PingDelayMin > d || c.stats.PingDelayMin == 0 {
+		c.stats.PingDelayMin = d
 	}
 	c.muStats.Unlock()
 }
 
 func (c *BaseClient) storePingError() {
 	c.muStats.Lock()
-	c.stats.RecentPingDelay = 0
+	c.stats.PingDelayRecent = 0
 	c.stats.CountPingError++
 	c.muStats.Unlock()
 }

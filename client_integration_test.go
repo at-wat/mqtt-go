@@ -266,14 +266,14 @@ func TestIntegration_Ping(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			if d := cli.Stats().RecentPingDelay; d != 0 {
-				t.Errorf("Initial RecentPingDelay must be 0, got %v", d)
+			if d := cli.Stats().PingDelayRecent; d != 0 {
+				t.Errorf("Initial PingDelayRecent must be 0, got %v", d)
 			}
-			if d := cli.Stats().MaxPingDelay; d != 0 {
-				t.Errorf("Initial MaxPingDelay must be 0, got %v", d)
+			if d := cli.Stats().PingDelayMax; d != 0 {
+				t.Errorf("Initial PingDelayMax must be 0, got %v", d)
 			}
-			if d := cli.Stats().MinPingDelay; d != 0 {
-				t.Errorf("Initial MinPingDelay must be 0, got %v", d)
+			if d := cli.Stats().PingDelayMin; d != 0 {
+				t.Errorf("Initial PingDelayMin must be 0, got %v", d)
 			}
 			if c := cli.Stats().CountPingError; c != 0 {
 				t.Errorf("Initial CountPingError must be 0, got %v", c)
@@ -283,14 +283,14 @@ func TestIntegration_Ping(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
-			if d := cli.Stats().RecentPingDelay; d <= 0 {
-				t.Errorf("Initial RecentPingDelay must be >0, got %v", d)
+			if d := cli.Stats().PingDelayRecent; d <= 0 {
+				t.Errorf("Initial PingDelayRecent must be >0, got %v", d)
 			}
-			if d := cli.Stats().MaxPingDelay; d <= 0 {
-				t.Errorf("Initial MaxPingDelay must be >0, got %v", d)
+			if d := cli.Stats().PingDelayMax; d <= 0 {
+				t.Errorf("Initial PingDelayMax must be >0, got %v", d)
 			}
-			if d := cli.Stats().MinPingDelay; d <= 0 {
-				t.Errorf("Initial MinPingDelay must be >0, got %v", d)
+			if d := cli.Stats().PingDelayMin; d <= 0 {
+				t.Errorf("Initial PingDelayMin must be >0, got %v", d)
 			}
 			if c := cli.Stats().CountPingError; c != 0 {
 				t.Errorf("CountPingError must be 0, got %v", c)
