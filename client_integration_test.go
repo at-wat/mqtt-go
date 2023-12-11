@@ -266,8 +266,34 @@ func TestIntegration_Ping(t *testing.T) {
 				t.Fatalf("Unexpected error: '%v'", err)
 			}
 
+			if d := cli.Stats().RecentPingDelay; d != 0 {
+				t.Errorf("Initial RecentPingDelay must be 0, got %v", d)
+			}
+			if d := cli.Stats().MaxPingDelay; d != 0 {
+				t.Errorf("Initial MaxPingDelay must be 0, got %v", d)
+			}
+			if d := cli.Stats().MinPingDelay; d != 0 {
+				t.Errorf("Initial MinPingDelay must be 0, got %v", d)
+			}
+			if c := cli.Stats().CountPingError; c != 0 {
+				t.Errorf("Initial CountPingError must be 0, got %v", c)
+			}
+
 			if err := cli.Ping(ctx); err != nil {
 				t.Fatalf("Unexpected error: '%v'", err)
+			}
+
+			if d := cli.Stats().RecentPingDelay; d > 0 {
+				t.Errorf("Initial RecentPingDelay must be >0, got %v", d)
+			}
+			if d := cli.Stats().MaxPingDelay; d > 0 {
+				t.Errorf("Initial MaxPingDelay must be >0, got %v", d)
+			}
+			if d := cli.Stats().MinPingDelay; d > 0 {
+				t.Errorf("Initial MinPingDelay must be >0, got %v", d)
+			}
+			if c := cli.Stats().CountPingError; c != 0 {
+				t.Errorf("CountPingError must be 0, got %v", c)
 			}
 
 			if err := cli.Disconnect(ctx); err != nil {
