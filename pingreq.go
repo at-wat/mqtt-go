@@ -16,6 +16,7 @@ package mqtt
 
 import (
 	"context"
+	"time"
 )
 
 // Ping to the broker.
@@ -33,6 +34,8 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 	sig.mu.Unlock()
 
 	pkt := pack(packetPingReq.b())
+
+	tReq := time.Now()
 	if err := c.write(pkt); err != nil {
 		return wrapError(err, "sending PINGREQ")
 	}
@@ -40,8 +43,11 @@ func (c *BaseClient) Ping(ctx context.Context) error {
 	case <-c.connClosed:
 		return wrapError(ErrClosedTransport, "sending PINGREQ")
 	case <-ctx.Done():
+		c.storePingError()
 		return wrapError(ctx.Err(), "waiting PINGRESP")
 	case <-chPingResp:
+		tRes := time.Now()
+		c.storePingDelay(tRes.Sub(tReq))
 	}
 	return nil
 }

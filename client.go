@@ -18,6 +18,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 )
 
 // ErrNotConnected is returned if a function is called before Connect.
@@ -45,6 +46,47 @@ type BaseClient struct {
 	muConnecting sync.RWMutex
 	muWrite      sync.Mutex
 	idLast       uint32
+
+	muStats sync.RWMutex
+	stats   BaseStats
+}
+
+// BaseStats stores base client statistics.
+type BaseStats struct {
+	// Recent ping delay.
+	PingDelayRecent time.Duration
+	// Maximum ping delay.
+	PingDelayMax time.Duration
+	// Minimum ping delay.
+	PingDelayMin time.Duration
+	// Count of ping error.
+	CountPingError int
+}
+
+func (c *BaseClient) storePingDelay(d time.Duration) {
+	c.muStats.Lock()
+	c.stats.PingDelayRecent = d
+	if c.stats.PingDelayMax < d {
+		c.stats.PingDelayMax = d
+	}
+	if c.stats.PingDelayMin > d || c.stats.PingDelayMin == 0 {
+		c.stats.PingDelayMin = d
+	}
+	c.muStats.Unlock()
+}
+
+func (c *BaseClient) storePingError() {
+	c.muStats.Lock()
+	c.stats.PingDelayRecent = 0
+	c.stats.CountPingError++
+	c.muStats.Unlock()
+}
+
+// Stats returns base client stats.
+func (c *BaseClient) Stats() BaseStats {
+	c.muStats.RLock()
+	defer c.muStats.RUnlock()
+	return c.stats
 }
 
 // Handle registers the message handler.

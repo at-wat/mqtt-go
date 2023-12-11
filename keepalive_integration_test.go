@@ -54,6 +54,10 @@ func TestIntegration_KeepAlive(t *testing.T) {
 					t.Fatalf("Unexpected error: '%v'", err)
 				}
 			}
+
+			if c := cli.Stats().CountPingError; c != 1 {
+				t.Errorf("CountPingError must be 1, got %v", c)
+			}
 		})
 	}
 }
