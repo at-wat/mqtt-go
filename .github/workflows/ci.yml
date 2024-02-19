@@ -66,6 +66,7 @@ jobs:
 
           go mod tidy
           git diff --exit-code go.mod go.sum  # mod/sum must be up-to-date and tidied
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           files: ./cover.out,./paho/cover.out
+          token: ${{ secrets.CODECOV_TOKEN }}
