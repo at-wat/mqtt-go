@@ -2,4 +2,4 @@ module github.com/at-wat/mqtt-go
 
 go 1.12
 
-require golang.org/x/net v0.21.0
+require golang.org/x/net v0.22.0
