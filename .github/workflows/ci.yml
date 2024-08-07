@@ -39,7 +39,7 @@ jobs:
           (! grep require paho/go.mod)
           (! grep replace paho/go.mod)  # don't add require/replace to paho/go.mod
       - name: Prepare integration test
-        run: docker-compose up -d
+        run: docker compose up -d
       - name: Run go test
         run: |
           eval ${{ matrix.env }}
