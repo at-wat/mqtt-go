@@ -1,5 +1,5 @@
 module github.com/at-wat/mqtt-go
 
-go 1.15
+go 1.18
 
-require golang.org/x/net v0.23.0
+require golang.org/x/net v0.28.0
