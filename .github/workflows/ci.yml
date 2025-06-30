@@ -69,3 +69,17 @@ jobs:
         with:
           files: ./cover.out,./paho/cover.out
           token: ${{ secrets.CODECOV_TOKEN }}
+  check-tidied:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check tidied
+        run: |
+          go mod download
+          go mod tidy
+          git diff --exit-code go.mod
